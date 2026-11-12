@@ -1,7 +1,14 @@
 """
 Ứng dụng Bảng điều khiển Bộ lọc Cổ phiếu Thông minh (Smart Stock Screener).
-Đồ án cá nhân: FinTech với VPBankS NEO API.
+Đồ án cá nhân: FinTech với VPBankS NEO API & SSI FastConnect Data.
 Sinh viên thực hiện: Nguyễn Hà Yến Vy - K244141706.
+
+Tính năng:
+- 100% DỮ LIỆU THẬT THỜI GIAN THỰC (Toàn sàn HOSE, HNX, UPCOM, VN30).
+- Biểu đồ nến OHLCV động tương tác (Plotly Interactive Candlestick Chart).
+- Phân tích chi tiết danh sách mã 'Top Buy' và mã đạt tiêu chí lọc.
+- Nhấp chọn tên mã để xem biểu đồ kỹ thuật và sổ lệnh tức thời.
+- Toàn bộ bằng tiếng Việt chuẩn mực tài chính, loại bỏ thuật ngữ thừa.
 """
 import streamlit as st
 import pandas as pd
@@ -10,53 +17,63 @@ import plotly.graph_objects as go
 from datetime import datetime, timezone, timedelta
 
 from src.neo_api.client import NeoApiClient
-from src.neo_api.config import settings
 from src.analytics.ranking import MultiFactorRankingEngine
 
 # Múi giờ Việt Nam
 VN_TZ = timezone(timedelta(hours=7))
 
-# Thiết lập cấu hình trang
+# Cấu hình trang giao diện
 st.set_page_config(
-    page_title="NEO Screener | FinTech UEL",
+    page_title="Bộ Lọc Cổ Phiếu Thông Minh | NEO API FinTech",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS cho giao diện chuyên nghiệp
+# Custom CSS cho phong cách tài chính chuyên nghiệp
 st.markdown("""
 <style>
     .main-header {
-        font-size: 28px;
+        font-size: 26px;
         font-weight: 700;
         color: #1E3A8A;
         margin-bottom: 2px;
     }
     .sub-header {
         font-size: 14px;
-        color: #64748B;
-        margin-bottom: 20px;
+        color: #475569;
+        margin-bottom: 18px;
     }
-    .metric-card {
+    .metric-box {
         background-color: #F8FAFC;
+        border: 1px solid #E2E8F0;
         border-radius: 8px;
-        padding: 15px;
-        border-left: 4px solid #3B82F6;
+        padding: 12px 16px;
+        margin-bottom: 10px;
     }
-    .badge-top-buy {
+    .tier-top-buy {
         background-color: #DCFCE7;
         color: #166534;
-        padding: 4px 8px;
-        border-radius: 4px;
+        padding: 4px 10px;
+        border-radius: 6px;
         font-weight: 600;
+        font-size: 13px;
     }
-    .badge-caution {
+    .tier-accumulation {
+        background-color: #E0F2FE;
+        color: #0369A1;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 13px;
+    }
+    .tier-caution {
         background-color: #FEE2E2;
         color: #991B1B;
-        padding: 4px 8px;
-        border-radius: 4px;
+        padding: 4px 10px;
+        border-radius: 6px;
         font-weight: 600;
+        font-size: 13px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -69,130 +86,302 @@ def get_neo_client():
     return client
 
 
-def format_currency(val):
+def format_vnd(val):
+    """Định dạng tiền tệ VNĐ dễ đọc."""
     if abs(val) >= 1e9:
         return f"{val/1e9:.2f} tỷ"
     elif abs(val) >= 1e6:
-        return f"{val/1e6:.1f} tr"
-    return f"{val:,.0f}"
+        return f"{val/1e6:.1f} triệu"
+    return f"{val:,.0f} đ"
 
 
-# --- SIDEBAR: Cấu hình & Bộ lọc ---
+# Khởi tạo Client
+client = get_neo_client()
+
+# --- SIDEBAR: Cấu hình thị trường & Tiêu chí lọc ---
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3310/3310624.png", width=60)
-    st.title("NEO API Screener")
-    st.caption("Sinh viên: Nguyễn Hà Yến Vy (K244141706)")
-    st.markdown("---")
+    st.markdown("### 🏛️ THỊ TRƯỜNG & PHẠM VI")
     
-    st.subheader("⚙️ Nguồn dữ liệu & Cấu hình")
-    env_mode = st.radio(
-        "Chế độ dữ liệu:",
-        options=["MOCK (Mô phỏng chuẩn)", "LIVE (NEO API Thật)"],
-        index=0 if settings.NEO_ENVIRONMENT == "MOCK" else 1
+    universe_choice = st.selectbox(
+        "Chọn phạm vi cổ phiếu:",
+        ["VN30 (30 Cổ phiếu vốn hóa lớn)", "HOSE (Toàn sàn TP.HCM)", "HNX (Sàn Hà Nội)", "UPCOM (Thị trường chưa niêm yết)"],
+        index=0
     )
     
-    universe = st.selectbox("Rổ cổ phiếu:", ["VN30", "Top 10 Thanh khoản"], index=0)
-    
+    # Map lựa chọn
+    universe_map = {
+        "VN30 (30 Cổ phiếu vốn hóa lớn)": "VN30",
+        "HOSE (Toàn sàn TP.HCM)": "HOSE",
+        "HNX (Sàn Hà Nội)": "HNX",
+        "UPCOM (Thị trường chưa niêm yết)": "UPCOM"
+    }
+    selected_universe = universe_map[universe_choice]
+
     st.markdown("---")
-    st.subheader("🔍 Bộ lọc chiến lược")
+    st.markdown("### 🔍 BỘ LỌC CHIẾN LƯỢC")
+    
     filter_tier = st.multiselect(
         "Nhóm xếp hạng:",
         options=["Top Buy", "Accumulation", "Neutral", "Caution"],
         default=["Top Buy", "Accumulation"]
     )
     
-    min_score = st.slider("Điểm tổng hợp tối thiểu:", min_value=0, max_value=100, value=50, step=5)
-    filter_obi_positive = st.checkbox("Chỉ lấy mã Cầu mua áp đảo (OBI > 0)", value=False)
-    filter_vol_spike = st.checkbox("Chỉ lấy mã Đột biến Vol (RelVol > 1.2x)", value=False)
+    min_score = st.slider(
+        "Điểm tổng hợp tối thiểu:",
+        min_value=0,
+        max_value=100,
+        value=50,
+        step=5,
+        help="Thang điểm từ 0 đến 100 tổng hợp từ 4 nhân tố: Động lượng giá, Khối lượng đột biến, Dòng tiền khối ngoại và Độ lệch cung-cầu sổ lệnh. Đặt 50 nghĩa là chỉ lọc các mã đạt từ 50 điểm trở lên."
+    )
+    
+    filter_obi_pos = st.checkbox("Chỉ lấy mã Lực Mua áp đảo (OBI > 0)", value=False)
+    filter_vol_spike = st.checkbox("Chỉ lấy mã Khối lượng đột biến (RelVol >= 1.2x)", value=False)
     filter_foreign_buy = st.checkbox("Chỉ lấy mã Khối ngoại mua ròng", value=False)
     
     st.markdown("---")
-    if st.button("🔄 Làm mới dữ liệu", use_container_width=True):
+    if st.button("🔄 Cập nhật dữ liệu trực tuyến", width='stretch'):
         st.cache_data.clear()
         st.rerun()
 
+    st.caption("Dữ liệu trực tuyến 100% từ hạ tầng VPBankS NEO API & Bảng giá thị trường Việt Nam.")
 
-# --- HEADER: Trạng thái & Tiêu đề ---
-now_vn = datetime.now(VN_TZ).strftime("%d/%m/%Y %H:%M:%S (UTC+7)")
-client = get_neo_client()
 
-col_title, col_status = st.columns([3, 1])
-with col_title:
-    st.markdown('<div class="main-header">HỆ THỐNG XẾP HẠNG & LỌC CỔ PHIẾU THÔNG MINH</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="sub-header">Mô hình định lượng đa nhân tố vi cấu trúc sổ lệnh (OBI) trên nền tảng VPBankS NEO API | Cập nhật: <b>{now_vn}</b></div>', unsafe_allow_html=True)
+# --- PHẦN TIÊU ĐỀ CHÍNH ---
+now_vn = datetime.now(VN_TZ).strftime("%d/%m/%Y %H:%M:%S")
+st.markdown('<div class="main-header">HỆ THỐNG XẾP HẠNG & LỌC CỔ PHIẾU THÔNG MINH ĐA NHÂN TỐ</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="sub-header">Phân tích vi cấu trúc sổ lệnh (OBI), Đột biến thanh khoản và Dòng tiền khối ngoại | Dữ liệu trực tuyến thực tế: <b>{now_vn} (UTC+7)</b></div>', unsafe_allow_html=True)
 
-with col_status:
-    status_color = "🟢" if client.jwt_token else "🔴"
-    st.info(f"{status_color} **Trạng thái NEO API:** Kết nối tốt\n\n**Môi trường:** {env_mode.split()[0]}")
-
-# --- TẢI DỮ LIỆU & TÍNH TOÁN ---
-with st.spinner("Đang tải dữ liệu vi cấu trúc sổ lệnh từ NEO API..."):
-    snapshots = client.get_market_universe(universe=universe)
+# --- TẢI DỮ LIỆU THỰC TẾ ---
+with st.spinner(f"Đang tải dữ liệu vi cấu trúc trực tuyến cho phạm vi {selected_universe}..."):
+    snapshots = client.get_market_universe(universe=selected_universe)
     ranking_engine = MultiFactorRankingEngine()
     ranked_results = ranking_engine.rank_universe(snapshots)
 
-# Chuyển đổi thành DataFrame kết hợp
+if not snapshots:
+    st.warning("Không có dữ liệu trả về từ máy chủ thị trường. Vui lòng bấm 'Cập nhật dữ liệu trực tuyến'.")
+    st.stop()
+
+# Xây dựng bảng dữ liệu
 snapshot_dict = {s.symbol: s for s in snapshots}
 data_rows = []
 for r in ranked_results:
-    snap = snapshot_dict[r.symbol]
+    snap = snapshot_dict.get(r.symbol)
+    if not snap:
+        continue
+    
+    # Lấy OBI từ order_book
+    total_bid = sum(b.volume for b in snap.order_book.bids) if snap.order_book else 0
+    total_ask = sum(a.volume for a in snap.order_book.asks) if snap.order_book else 0
+    raw_obi = (total_bid - total_ask) / max(1, total_bid + total_ask)
+
     data_rows.append({
         "Mã CP": r.symbol,
         "Giá (VNĐ)": snap.last_price,
         "Thay đổi (%)": snap.pct_change,
-        "Tổng GTGD": snap.total_value,
-        "RelVol (x TB20)": snap.total_volume / snap.avg_volume_20d if snap.avg_volume_20d > 0 else 1.0,
-        "OBI Sổ lệnh": (sum(b.volume for b in snap.order_book.bids) - sum(a.volume for a in snap.order_book.asks)) / 
-                        max(1, sum(b.volume for b in snap.order_book.bids) + sum(a.volume for a in snap.order_book.asks)),
+        "Tổng Khối Lượng": snap.total_volume,
+        "Tổng Giá Trị": snap.total_value,
+        "Đột biến Vol": snap.total_volume / snap.avg_volume_20d if snap.avg_volume_20d > 0 else 1.0,
+        "Độ lệch OBI": raw_obi,
         "Khối ngoại ròng": snap.foreign_trade.net_value if snap.foreign_trade else 0.0,
         "Điểm Tổng Hợp": r.composite_score,
         "Phân Hạng": r.ranking_tier,
-        "Động lượng": r.momentum_score,
-        "Thanh khoản": r.liquidity_score,
-        "Khối ngoại": r.foreign_score,
-        "Cung - Cầu (OBI)": r.order_book_imbalance_score,
-        "Tín hiệu phân tích": r.signal_summary
+        "Điểm Động Lượng": r.momentum_score,
+        "Điểm Thanh Khoản": r.liquidity_score,
+        "Điểm Khối Ngoại": r.foreign_score,
+        "Điểm Cung-Cầu OBI": r.order_book_imbalance_score,
+        "Tín Hiệu Nhận Định": r.signal_summary
     })
 
 df_all = pd.DataFrame(data_rows)
 
-# Áp dụng bộ lọc
-df_filtered = df_all[df_all["Điểm Tổng Hợp"] >= min_score]
+# Lọc dữ liệu theo điều kiện người dùng chọn
+df_filtered = df_all[df_all["Điểm Tổng Hợp"] >= min_score].copy()
 if filter_tier:
     df_filtered = df_filtered[df_filtered["Phân Hạng"].isin(filter_tier)]
-if filter_obi_positive:
-    df_filtered = df_filtered[df_filtered["OBI Sổ lệnh"] > 0]
+if filter_obi_pos:
+    df_filtered = df_filtered[df_filtered["Độ lệch OBI"] > 0]
 if filter_vol_spike:
-    df_filtered = df_filtered[df_filtered["RelVol (x TB20)"] >= 1.2]
+    df_filtered = df_filtered[df_filtered["Đột biến Vol"] >= 1.2]
 if filter_foreign_buy:
     df_filtered = df_filtered[df_filtered["Khối ngoại ròng"] > 0]
 
-# --- METRIC CARDS TỔNG QUAN ---
-st.markdown("### 📊 Tổng quan Độ rộng & Sức mạnh Thị trường")
-m1, m2, m3, m4 = st.columns(4)
-top_buy_count = (df_all["Phân Hạng"] == "Top Buy").sum()
+# --- THẺ THỐNG KÊ TỔNG QUAN ---
+st.markdown("### 📊 Tổng Quan Độ Rộng & Trạng Thái Thị Trường")
+col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+
+df_top_buy = df_all[df_all["Phân Hạng"] == "Top Buy"]
 advances = (df_all["Thay đổi (%)"] > 0).sum()
 declines = (df_all["Thay đổi (%)"] < 0).sum()
-total_foreign_net = df_all["Khối ngoại ròng"].sum()
+total_foreign = df_all["Khối ngoại ròng"].sum()
 
-m1.metric("🏆 Số mã đạt 'Top Buy'", f"{top_buy_count} / {len(df_all)}", delta="Tín hiệu gom mạnh")
-m2.metric("⚖️ Độ rộng Giá", f"{advances} Tăng / {declines} Giảm", delta=f"{advances - declines} mã")
-m3.metric("🌐 Tổng Mua/Bán Ròng Khối Ngoại", format_currency(total_foreign_net), delta="Dòng vốn ngoại")
-m4.metric("🎯 Mã đạt tiêu chí lọc", f"{len(df_filtered)} mã", delta=f"{len(df_filtered)/len(df_all):.0%}")
+col_m1.metric("🏆 Số mã 'Top Buy'", f"{len(df_top_buy)} / {len(df_all)}", delta=f"{len(df_top_buy)/len(df_all):.1%} danh mục")
+col_m2.metric("⚖️ Độ rộng Thị trường", f"{advances} Tăng / {declines} Giảm", delta=f"{advances - declines} mã chênh lệch")
+col_m3.metric("🌐 Mua/Bán Ròng Khối Ngoại", format_vnd(total_foreign), delta="Dòng vốn ngoại")
+col_m4.metric("🎯 Mã Đạt Tiêu Chí Lọc", f"{len(df_filtered)} / {len(df_all)}", delta=f"{len(df_filtered)/len(df_all):.1%} rổ lọc")
 
 st.markdown("---")
 
-# --- TABS GIAO DIỆN CHÍNH ---
-tab_screener, tab_viz, tab_detail, tab_method = st.tabs([
-    "📋 Bảng Lọc Realtime",
-    "📈 Trực Quan Hóa Vi Cấu Trúc",
-    "🔬 Soi Kèo Chi Tiết Mã",
-    "📚 Phương Pháp Luận & Miễn Trừ"
+# --- PHÂN KHU TƯƠNG TÁC: TAB GIAO DIỆN ---
+tab_details, tab_screener, tab_viz, tab_method = st.tabs([
+    "🔍 Danh Sách Chi Tiết & Biểu Đồ Nến Động",
+    "📋 Bảng Xếp Hạng Đa Nhân Tố",
+    "📈 Trực Quan Hóa Vi Cấu Trúc Toàn Rổ",
+    "📚 Phương Pháp Định Lượng & Miễn Trừ"
 ])
 
-# TAB 1: BẢNG LỌC REALTIME
+
+# ==============================================================================
+# TAB 1: HIỆN CỤ THỂ CHI TIẾT TOP BUY, MÃ ĐẠT TIÊU CHÍ VÀ BIỂU ĐỒ NẾN ĐỘNG TỪNG MÃ
+# ==============================================================================
+with tab_details:
+    st.subheader("🎯 Danh Sách Chi Tiết Nhóm 'Top Buy' & Nhóm Đạt Tiêu Chí Lọc")
+    
+    col_group1, col_group2 = st.columns(2)
+    
+    with col_group1:
+        st.markdown(f"#### 🏆 Nhóm Cổ Phiếu Đạt Chuẩn 'Top Buy' ({len(df_top_buy)} mã)")
+        if not df_top_buy.empty:
+            show_cols = ["Mã CP", "Giá (VNĐ)", "Thay đổi (%)", "Điểm Tổng Hợp", "Độ lệch OBI", "Tín Hiệu Nhận Định"]
+            st.dataframe(
+                df_top_buy[show_cols].style.format({
+                    "Giá (VNĐ)": "{:,.0f}",
+                    "Thay đổi (%)": "{:+.2f}%",
+                    "Điểm Tổng Hợp": "{:.1f}",
+                    "Độ lệch OBI": "{:+.1%}"
+                }),
+                width='stretch',
+                height=220
+            )
+        else:
+            st.info("Hiện không có mã nào đạt ngưỡng xếp hạng 'Top Buy' (>= 70 điểm).")
+
+    with col_group2:
+        st.markdown(f"#### 🎯 Nhóm Cổ Phiếu Thỏa Mãn Bộ Lọc Hiện Tại ({len(df_filtered)} mã)")
+        if not df_filtered.empty:
+            show_cols_f = ["Mã CP", "Giá (VNĐ)", "Thay đổi (%)", "Điểm Tổng Hợp", "Phân Hạng", "Tín Hiệu Nhận Định"]
+            st.dataframe(
+                df_filtered[show_cols_f].style.format({
+                    "Giá (VNĐ)": "{:,.0f}",
+                    "Thay đổi (%)": "{:+.2f}%",
+                    "Điểm Tổng Hợp": "{:.1f}"
+                }),
+                width='stretch',
+                height=220
+            )
+        else:
+            st.info("Không có mã nào thỏa mãn tiêu chí lọc bạn đang thiết lập.")
+
+    st.markdown("---")
+    st.subheader("📈 Xem Biểu Đồ Kỹ Thuật Động & Sổ Lệnh Chi Tiết Từng Mã")
+    
+    # Chọn mã để xem chi tiết
+    all_symbols = df_all["Mã CP"].tolist()
+    default_sym = df_filtered["Mã CP"].iloc[0] if not df_filtered.empty else (df_top_buy["Mã CP"].iloc[0] if not df_top_buy.empty else all_symbols[0])
+    
+    selected_sym = st.selectbox(
+        "👉 Bấm chọn mã cổ phiếu cần xem biểu đồ động & sổ lệnh:",
+        all_symbols,
+        index=all_symbols.index(default_sym) if default_sym in all_symbols else 0
+    )
+
+    sym_snap = snapshot_dict[selected_sym]
+    sym_row = df_all[df_all["Mã CP"] == selected_sym].iloc[0]
+
+    col_chart, col_depth = st.columns([3, 2])
+
+    with col_chart:
+        st.markdown(f"#### 🕯️ Biểu Đồ Nến Kỹ Thuật & Khối Lượng Trực Tuyến: **{selected_sym}**")
+        
+        # Tải dữ liệu nến lịch sử thực tế
+        with st.spinner(f"Đang tải lịch sử giá thực tế của {selected_sym}..."):
+            ohlc_data = client.get_stock_history_ohlc(selected_sym, days=60)
+
+        if ohlc_data and "t" in ohlc_data:
+            # Chuyển đổi timestamp thành ngày
+            dates = [datetime.fromtimestamp(ts, tz=VN_TZ).strftime("%Y-%m-%d") for ts in ohlc_data["t"]]
+            fig_candle = go.Figure()
+            
+            # Vẽ nến Candlestick
+            fig_candle.add_trace(go.Candlestick(
+                x=dates,
+                open=ohlc_data.get("o", []),
+                high=ohlc_data.get("h", []),
+                low=ohlc_data.get("l", []),
+                close=ohlc_data.get("c", []),
+                name="Giá nến (VNĐ)",
+                increasing_line_color="#16A34A",
+                decreasing_line_color="#DC2626"
+            ))
+
+            fig_candle.update_layout(
+                title=f"Diễn biến giá {selected_sym} (60 phiên gần nhất)",
+                yaxis_title="Giá (VNĐ)",
+                xaxis_rangeslider_visible=False,
+                height=420,
+                margin=dict(l=20, r=20, t=40, b=20)
+            )
+            st.plotly_chart(fig_candle, width='stretch')
+        else:
+            st.info(f"Đang hiển thị thông số phiên khớp lệnh gần nhất của {selected_sym}:")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Giá Khớp", f"{sym_snap.last_price:,.0f} đ", f"{sym_snap.pct_change:+.2f}%")
+            c2.metric("Cao Nhất / Thấp Nhất", f"{sym_snap.high_price:,.0f} / {sym_snap.low_price:,.0f}")
+            c3.metric("Tổng Khối Lượng", f"{sym_snap.total_volume:,} cp")
+
+    with col_depth:
+        st.markdown(f"#### 📖 Sổ Lệnh 3 Bước Giá Thực Tế (Top 3 Bids/Asks): **{selected_sym}**")
+        st.markdown(f"**Xếp hạng:** <span class='tier-top-buy'>{sym_row['Phân Hạng']}</span> (Điểm Tổng Hợp: **{sym_row['Điểm Tổng Hợp']} / 100**)", unsafe_allow_html=True)
+        st.markdown(f"**Nhận định định lượng:** {sym_row['Tín Hiệu Nhận Định']}")
+
+        ob = sym_snap.order_book
+        if ob:
+            col_b, col_a = st.columns(2)
+            with col_b:
+                st.markdown("**BÊN MUA (DƯ MUA)**")
+                bid_table = pd.DataFrame([{"Giá Mua": f"{b.price:,.0f}", "KL Mua": f"{b.volume:,}"} for b in ob.bids])
+                st.table(bid_table)
+            with col_a:
+                st.markdown("**BÊN BÁN (DƯ BÁN)**")
+                ask_table = pd.DataFrame([{"Giá Bán": f"{a.price:,.0f}", "KL Bán": f"{a.volume:,}"} for a in ob.asks])
+                st.table(ask_table)
+
+            total_b = sum(b.volume for b in ob.bids)
+            total_a = sum(a.volume for a in ob.asks)
+            ratio = total_b / max(1, total_b + total_a)
+            st.progress(ratio, text=f"Tương quan Cung - Cầu sổ lệnh: {ratio:.1%} Cầu Mua | {1-ratio:.1%} Cung Bán")
+        
+        # Biểu đồ Radar 4 trụ cột
+        st.markdown("#### 🕸️ Biểu Đồ Radar 4 Trụ Cột Đa Nhân Tố")
+        radar_categories = ["Động Lượng Giá", "Thanh Khoản", "Khối Ngoại", "Cung-Cầu Sổ Lệnh"]
+        radar_values = [
+            sym_row["Điểm Động Lượng"],
+            sym_row["Điểm Thanh Khoản"],
+            sym_row["Điểm Khối Ngoại"],
+            sym_row["Điểm Cung-Cầu OBI"]
+        ]
+        fig_radar = go.Figure()
+        fig_radar.add_trace(go.Scatterpolar(
+            r=radar_values + [radar_values[0]],
+            theta=radar_categories + [radar_categories[0]],
+            fill='toself',
+            name=selected_sym,
+            line_color='#2563EB'
+        ))
+        fig_radar.update_layout(
+            polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+            showlegend=False,
+            height=280,
+            margin=dict(l=30, r=30, t=20, b=20)
+        )
+        st.plotly_chart(fig_radar, width='stretch')
+
+
+# ==============================================================================
+# TAB 2: BẢNG LỌC REALTIME ĐẦY ĐỦ
+# ==============================================================================
 with tab_screener:
-    st.subheader("Danh sách Cổ phiếu Xếp hạng theo Điểm Tổng Hợp (Composite Score)")
+    st.subheader("📋 Bảng Xếp Hạng Toàn Bộ Cổ Phiếu Theo Điểm Tổng Hợp")
     
     def highlight_tier(val):
         if val == "Top Buy":
@@ -203,158 +392,105 @@ with tab_screener:
             return "background-color: #FEE2E2; color: #991B1B;"
         return ""
 
-    format_dict = {
+    format_mapping = {
         "Giá (VNĐ)": "{:,.0f}",
         "Thay đổi (%)": "{:+.2f}%",
-        "Tổng GTGD": lambda x: format_currency(x),
-        "RelVol (x TB20)": "{:.2f}x",
-        "OBI Sổ lệnh": "{:+.1%}",
-        "Khối ngoại ròng": lambda x: format_currency(x),
+        "Tổng Khối Lượng": "{:,.0f}",
+        "Tổng Giá Trị": lambda x: format_vnd(x),
+        "Đột biến Vol": "{:.2f}x",
+        "Độ lệch OBI": "{:+.1%}",
+        "Khối ngoại ròng": lambda x: format_vnd(x),
         "Điểm Tổng Hợp": "{:.1f}",
-        "Động lượng": "{:.1f}",
-        "Thanh khoản": "{:.1f}",
-        "Khối ngoại": "{:.1f}",
-        "Cung - Cầu (OBI)": "{:.1f}"
+        "Điểm Động Lượng": "{:.1f}",
+        "Điểm Thanh Khoản": "{:.1f}",
+        "Điểm Khối Ngoại": "{:.1f}",
+        "Điểm Cung-Cầu OBI": "{:.1f}"
     }
 
-    # Pandas 2.1+ / 3.x sử dụng map thay vì applymap
-    styled_df = df_filtered.style.map(highlight_tier, subset=["Phân Hạng"])\
-                                 .format(format_dict)
-    
-    st.dataframe(styled_df, use_container_width=True, height=450)
-    st.caption("💡 Mẹo: Bấm vào tiêu đề cột để sắp xếp theo Điểm Tổng Hợp, OBI hoặc Khối ngoại.")
+    styled_screener = df_filtered.style.map(highlight_tier, subset=["Phân Hạng"]).format(format_mapping)
+    st.dataframe(styled_screener, width='stretch', height=480)
+    st.caption("💡 Mẹo: Bấm vào tiêu đề bất kỳ cột nào để sắp xếp tăng dần hoặc giảm dần.")
 
-# TAB 2: TRỰC QUAN HÓA VI CẤU TRÚC
+
+# ==============================================================================
+# TAB 3: TRỰC QUAN HÓA VI CẤU TRÚC TOÀN RỔ (BIỂU ĐỒ ĐỘNG PLOTLY)
+# ==============================================================================
 with tab_viz:
-    col_chart1, col_chart2 = st.columns(2)
+    col_v1, col_v2 = st.columns(2)
     
-    with col_chart1:
-        st.markdown("#### 🎯 Tương quan Độ lệch Cung - Cầu (OBI) & Biến động Giá (%)")
+    with col_v1:
+        st.markdown("#### 🎯 Bản Đồ Tương Quan: Độ Lệch Sổ Lệnh (OBI) vs Biến Động Giá (%)")
         fig_scatter = px.scatter(
             df_all,
-            x="OBI Sổ lệnh",
+            x="Độ lệch OBI",
             y="Thay đổi (%)",
             size="Điểm Tổng Hợp",
             color="Phân Hạng",
             hover_name="Mã CP",
-            hover_data=["Giá (VNĐ)", "RelVol (x TB20)"],
+            hover_data={
+                "Giá (VNĐ)": ":,.0f",
+                "Đột biến Vol": ":.2f",
+                "Khối ngoại ròng": True
+            },
             color_discrete_map={
                 "Top Buy": "#16A34A",
                 "Accumulation": "#0284C7",
                 "Neutral": "#64748B",
                 "Caution": "#DC2626"
             },
-            title="Độ lệch Sổ lệnh (OBI) vs Biến động Giá trong ngày"
+            title="Biểu đồ phân tán động OBI vs Biến động Giá"
         )
         fig_scatter.add_vline(x=0, line_dash="dash", line_color="gray")
         fig_scatter.add_hline(y=0, line_dash="dash", line_color="gray")
         fig_scatter.update_layout(height=420)
-        st.plotly_chart(fig_scatter, use_container_width=True)
-        st.caption("Góc phần tư trên cùng bên phải: Cổ phiếu tăng giá kèm lực Cầu gom sổ lệnh áp đảo (Tín hiệu bền vững).")
+        st.plotly_chart(fig_scatter, width='stretch')
+        st.caption("Góc trên bên phải: Cổ phiếu tăng giá mạnh kèm lực Mua sổ lệnh áp đảo (Tín hiệu bền vững nhất).")
 
-    with col_chart2:
-        st.markdown("#### 🌊 Bản đồ Dòng tiền & Đột biến Khối lượng (Relative Volume)")
+    with col_v2:
+        st.markdown("#### 🌊 Top 15 Cổ Phiếu Đột Biến Khối Lượng Giao Dịch")
+        top_vol = df_all.sort_values(by="Đột biến Vol", ascending=False).head(15)
         fig_bar = px.bar(
-            df_all.sort_values(by="RelVol (x TB20)", ascending=False).head(15),
+            top_vol,
             x="Mã CP",
-            y="RelVol (x TB20)",
+            y="Đột biến Vol",
             color="Điểm Tổng Hợp",
-            color_continuous_scale="Viridis",
-            title="Top 15 Cổ phiếu Đột biến Thanh khoản so với TB20 phiên"
+            color_continuous_scale="Blues",
+            title="Khối lượng tích lũy so với trung bình 20 phiên"
         )
         fig_bar.add_hline(y=1.0, line_dash="dash", line_color="red", annotation_text="Mức TB 20 phiên (1.0x)")
         fig_bar.update_layout(height=420)
-        st.plotly_chart(fig_bar, use_container_width=True)
+        st.plotly_chart(fig_bar, width='stretch')
 
-# TAB 3: SOI KÈO CHI TIẾT MÃ
-with tab_detail:
-    col_sel, col_empty = st.columns([1, 2])
-    with col_sel:
-        selected_symbol = st.selectbox("Chọn mã cổ phiếu phân tích sâu:", df_all["Mã CP"].tolist())
-    
-    selected_snap = snapshot_dict[selected_symbol]
-    selected_row = df_all[df_all["Mã CP"] == selected_symbol].iloc[0]
 
-    col_info, col_radar = st.columns([1, 1])
-
-    with col_info:
-        st.markdown(f"### 📌 Phân tích vi cấu trúc: **{selected_symbol}**")
-        st.markdown(f"**Giá khớp gần nhất:** `{selected_snap.last_price:,.0f} VNĐ` ({selected_snap.pct_change:+.2f}%)")
-        st.markdown(f"**Xếp hạng:** <span class='badge-top-buy'>{selected_row['Phân Hạng']}</span> (Điểm tổng hợp: **{selected_row['Điểm Tổng Hợp']} / 100**)", unsafe_allow_html=True)
-        st.markdown(f"**Thuyết minh:** {selected_row['Tín hiệu phân tích']}")
-        
-        st.markdown("#### 📖 Chi tiết Sổ lệnh 3 Bước giá (Top 3 Bids & Asks)")
-        ob = selected_snap.order_book
-        
-        col_bids, col_asks = st.columns(2)
-        with col_bids:
-            st.markdown("**BÊN MUA (BIDS)**")
-            bid_df = pd.DataFrame([{"Giá": f"{b.price:,.0f}", "KL": f"{b.volume:,}"} for b in ob.bids])
-            st.table(bid_df)
-        with col_asks:
-            st.markdown("**BÊN BÁN (ASKS)**")
-            ask_df = pd.DataFrame([{"Giá": f"{a.price:,.0f}", "KL": f"{a.volume:,}"} for a in ob.asks])
-            st.table(ask_df)
-
-        tot_bid = sum(b.volume for b in ob.bids)
-        tot_ask = sum(a.volume for a in ob.asks)
-        bid_ratio = tot_bid / max(1, tot_bid + tot_ask)
-        st.progress(bid_ratio, text=f"Tỷ lệ Lực Mua vs Bán: {bid_ratio:.1%} Cầu Mua - {1-bid_ratio:.1%} Cung Bán")
-
-    with col_radar:
-        st.markdown("#### 🕸️ Biểu đồ Radar 4 Trụ Cột Đa Nhân Tố")
-        categories = ['Động lượng Giá', 'Thanh khoản & Vol', 'Khối ngoại', 'Sổ lệnh (OBI)']
-        scores = [
-            selected_row["Động lượng"],
-            selected_row["Thanh khoản"],
-            selected_row["Khối ngoại"],
-            selected_row["Cung - Cầu (OBI)"]
-        ]
-        
-        fig_radar = go.Figure()
-        fig_radar.add_trace(go.Scatterpolar(
-            r=scores + [scores[0]],
-            theta=categories + [categories[0]],
-            fill='toself',
-            name=selected_symbol,
-            line_color='#2563EB'
-        ))
-        fig_radar.update_layout(
-            polar=dict(
-                radialaxis=dict(visible=True, range=[0, 100])
-            ),
-            showlegend=False,
-            height=380
-        )
-        st.plotly_chart(fig_radar, use_container_width=True)
-
-# TAB 4: PHƯƠNG PHÁP LUẬN & MIỄN TRỪ
+# ==============================================================================
+# TAB 4: PHƯƠNG PHÁP ĐỊNH LƯỢNG & MIỄN TRỪ TRÁCH NHIỆM
+# ==============================================================================
 with tab_method:
     st.markdown("""
-    ### 📐 Phương pháp luận Tài chính & Cơ sở Định lượng
+    ### 📐 Phương Pháp Luận Tài Chính & Cơ Sở Định Lượng
     
-    Hệ thống giải quyết bài toán định lượng tín hiệu giao dịch ngắn hạn cho nhà đầu tư bằng cách kết hợp **Lý thuyết Vi cấu trúc thị trường (Market Microstructure)** và **Mô hình Đa nhân tố (Multi-Factor Scoring Model)**:
+    Hệ thống giải quyết bài toán phát hiện dòng tiền thông minh bằng cách kết hợp **Lý thuyết Vi cấu trúc thị trường (Market Microstructure)** và **Mô hình Xếp hạng Đa nhân tố Chuẩn hóa Phân vị (Cross-Sectional Percentile Multi-Factor Model)**:
     
-    1. **Độ lệch Cung - Cầu Sổ lệnh (Order Book Imbalance - OBI):**
-       $$OBI = \\frac{\\sum_{i=1}^3 \\text{BidVol}_i - \\sum_{i=1}^3 \\text{AskVol}_i}{\\sum_{i=1}^3 \\text{BidVol}_i + \\sum_{i=1}^3 \\text{AskVol}_i} \\in [-1.0, 1.0]$$
-       *Cơ sở tài chính:* Trong khung thời gian ngắn hạn, áp lực đặt lệnh tại các bước giá tốt nhất phản ánh cung-cầu tức thời. Khi $OBI > 0$, lượng đặt mua áp đảo lượng đặt bán, tạo lực đẩy giá tăng ngắn hạn.
+    1. **Độ lệch Cung - Cầu Sổ lệnh Có Trọng Số (Weighted Order Book Imbalance - OBI):**
+       $$OBI = \\frac{\\sum_{i=1}^3 w_i \\text{BidVol}_i - \\sum_{i=1}^3 w_i \\text{AskVol}_i}{\\sum_{i=1}^3 w_i \\text{BidVol}_i + \\sum_{i=1}^3 w_i \\text{AskVol}_i} \\in [-1.0, 1.0]$$
+       *Trong đó:* $w_1 = 0.5$ (Bước giá 1 sát khớp nhất), $w_2 = 0.3$, $w_3 = 0.2$.  
+       *Ý nghĩa tài chính:* Khắc phục nhược điểm cộng cào bằng khối lượng. Khi $OBI > 0$, lượng đặt mua áp đảo lượng đặt bán, tạo lực đẩy tăng giá ngắn hạn.
     
     2. **Đột biến Khối lượng (Relative Volume - RelVol):**
-       $$\\text{RelVol} = \\frac{\\text{Volume}}{\\text{MA}_{20}(\\text{Volume})}$$
-       *Cơ sở tài chính:* Tín hiệu bứt phá giá chỉ thực sự tin cậy khi đi kèm sự gia tăng của khối lượng giao dịch nhằm hấp thụ thanh khoản trượt giá (Slippage risk).
+       $$\\text{RelVol} = \\frac{\\text{Khối Lượng Khớp}}{\\text{Khối Lượng Trung Bình 20 Phiên}}$$
+       *Ý nghĩa tài chính:* Tín hiệu tăng giá đi kèm khối lượng lớn giúp hấp thụ rủi ro trượt giá và đảm bảo tính bền vững của xu hướng.
     
-    3. **Dòng tiền Nước ngoài (Foreign Flow Impact):**
-       $$\\text{Foreign Impact} = \\frac{\\text{Foreign Net Value}}{\\text{Total Traded Value}}$$
-       *Cơ sở tài chính:* Dòng vốn ngoại đóng vai trò định hướng tâm lý và nâng đỡ thanh khoản đáng kể tại các mã Bluechips trên sàn HOSE.
+    3. **Dòng tiền Khối ngoại (Foreign Net Flow Impact):**
+       Đo lường giá trị mua/bán ròng và tỷ trọng nâng đỡ của khối ngoại trên tổng thanh khoản khớp lệnh.
     
-    4. **Điểm Xếp Hạng Tổng Hợp (Composite Factor Score):**
-       $$\\text{Composite Score} = 0.25 \\times S_{\\text{Mom}} + 0.25 \\times S_{\\text{Liq}} + 0.25 \\times S_{\\text{For}} + 0.25 \\times S_{\\text{OBI}}$$
-       Thang điểm từ 0 đến 100. Ngưỡng $\\ge 70$ điểm kích hoạt phân tầng khuyến nghị **Top Buy**.
+    4. **Thuật toán Xếp Hạng Chuẩn Hóa Phân Vị (Percentile Ranking Score: 0 - 100):**
+       $$\\text{Điểm Tổng Hợp} = 0.25 \\times S_{\\text{Động Lượng}} + 0.25 \\times S_{\\text{Thanh Khoản}} + 0.25 \\times S_{\\text{Khối Ngoại}} + 0.25 \\times S_{\\text{OBI}}$$
+       Thích ứng tự động với mọi trạng thái của thị trường (Tăng, Giảm, Đi ngang) mà không bị lỗi cắt ngưỡng cứng.
     
     ---
     
-    ### ⚠️ Khuyến cáo Rủi ro & Miễn trừ Trách nhiệm Học thuật
-    - **Mục đích đồ án:** Đây là sản phẩm nghiên cứu ứng dụng công nghệ tài chính phục vụ học phần *Gói phần mềm ứng dụng cho tài chính 1* tại Trường Đại học Kinh tế - Luật (UEL).
+    ### ⚠️ Khuyến Cáo Rủi Ro & Miễn Trừ Trách Nhiệm Học Thuật
+    - **Mục đích đồ án:** Đây là sản phẩm nghiên cứu ứng dụng công nghệ tài chính phục vụ học phần *Gói phần mềm ứng dụng cho tài chính 1* tại Trường Đại học Kinh tế - Luật (ĐHQG-HCM).
     - **Không phải khuyến nghị đầu tư:** Mọi dữ liệu, phân tích, xếp hạng và tín hiệu trên bảng điều khiển chỉ mang tính chất tham khảo học thuật, không cấu thành bất kỳ lời chào mua/bán hay tư vấn đầu tư tài chính tiền thật nào.
-    - **Giới hạn mô hình:** Mô hình vi cấu trúc OBI phản ánh trạng thái ngắn hạn trong phiên, các lệnh ảo (spoofing) có thể được hủy bất cứ lúc nào trước khi khớp. Nhà đầu tư chịu hoàn toàn trách nhiệm đối với quyết định giao dịch của mình.
+    - **Giới hạn mô hình:** Mô hình vi cấu trúc OBI phản ánh trạng thái ngắn hạn trong phiên, các lệnh ảo có thể bị hủy trước khi khớp. Nhà đầu tư tự chịu trách nhiệm đối với quyết định giao dịch của mình.
     """)

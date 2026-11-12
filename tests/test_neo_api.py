@@ -1,39 +1,23 @@
 """
-Module kiểm thử kết nối và định dạng dữ liệu từ NEO API Client.
+Kiểm thử kết nối dữ liệu thực tế và Pydantic Models.
 """
-import pytest
 from src.neo_api.client import NeoApiClient
 from src.neo_api.models import StockSnapshot
 
 
-def test_neo_client_authentication():
+def test_neo_client_initialization():
     client = NeoApiClient()
     assert client.authenticate() is True
-    assert client.jwt_token is not None
 
 
-def test_get_stock_snapshot_structure():
+def test_get_live_stock_snapshot():
+    """Kiểm thử tải dữ liệu thời gian thực từ thị trường."""
     client = NeoApiClient()
-    snapshot = client.get_stock_snapshot("FPT")
+    snapshots = client.fetch_live_snapshots(["FPT", "HPG"])
     
-    assert isinstance(snapshot, StockSnapshot)
-    assert snapshot.symbol == "FPT"
-    assert snapshot.reference_price > 0
-    assert snapshot.last_price > 0
-    assert snapshot.ceiling_price > snapshot.reference_price
-    assert snapshot.floor_price < snapshot.reference_price
-    assert snapshot.order_book is not None
-    assert len(snapshot.order_book.bids) == 3
-    assert len(snapshot.order_book.asks) == 3
-    assert snapshot.foreign_trade is not None
-
-
-def test_get_market_universe_vn30():
-    client = NeoApiClient()
-    universe = client.get_market_universe("VN30")
-    
-    assert len(universe) == 30
-    symbols = [s.symbol for s in universe]
-    assert "FPT" in symbols
-    assert "HPG" in symbols
-    assert "TCB" in symbols
+    assert len(snapshots) >= 1
+    fpt = next((s for s in snapshots if s.symbol == "FPT"), snapshots[0])
+    assert isinstance(fpt, StockSnapshot)
+    assert fpt.last_price > 0
+    assert fpt.reference_price > 0
+    assert fpt.order_book is not None

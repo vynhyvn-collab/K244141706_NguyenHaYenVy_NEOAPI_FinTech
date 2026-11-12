@@ -1,8 +1,7 @@
 """
-Module cấu hình dự án Smart Stock Screener.
-Quản lý biến môi trường, bảo mật thông tin và tham số vận hành.
+Cấu hình hệ thống Smart Stock Screener.
+Quản lý biến môi trường, bảo mật và nguồn cấp dữ liệu trực tuyến thật.
 """
-import os
 from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
@@ -20,10 +19,6 @@ class Settings(BaseSettings):
     NEO_CONSUMER_SECRET: str = Field(default="", description="VPBankS Consumer Secret")
     NEO_ACCOUNT_NO: str = Field(default="", description="Tài khoản giao dịch VPBankS")
     
-    NEO_ENVIRONMENT: Literal["LIVE", "MOCK"] = Field(
-        default="MOCK",
-        description="Môi trường kết nối: LIVE (khi có API key) hoặc MOCK (mô phỏng dữ liệu chuẩn)"
-    )
     NEO_API_BASE_URL: str = Field(
         default="https://neoinvest.vpbanks.com.vn/neo-openapi",
         description="Base URL REST API của NEO"
@@ -37,7 +32,7 @@ class Settings(BaseSettings):
         description="Giới hạn tối đa số request/giây (NEO quy định 5 req/s)"
     )
 
-    # 2. SSI FastConnect API (Tùy chọn bổ trợ)
+    # 2. SSI FastConnect API
     SSI_CONSUMER_ID: str = Field(default="", description="SSI FastConnect Consumer ID")
     SSI_CONSUMER_SECRET: str = Field(default="", description="SSI Consumer Secret")
     SSI_PRIVATE_KEY_PATH: str = Field(default="", description="Đường dẫn file RSA Private Key")
