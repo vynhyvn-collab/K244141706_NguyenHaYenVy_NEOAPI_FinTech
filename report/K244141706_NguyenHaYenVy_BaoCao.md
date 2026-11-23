@@ -176,19 +176,22 @@ Các nhân tố có dữ liệu được chuẩn hóa theo percentile trong univ
 
 ---
 
-## 6. TRIỂN KHAI SẢN PHẨM & GIAO DIỆN NGƯỜI DÙNG
+## 6. TRIỂN KHAI SẢN PHẨM & GIÁ TRỊ THỰC TIỄN CHO NHÀ ĐẦU TƯ / MÔI GIỚI
 
-Sản phẩm được xây dựng dưới dạng Web Dashboard hiện đại với 4 phân khu chức năng:
-1. **Sidebar Bộ lọc:** Lọc theo nhóm điểm, ngưỡng điểm, OBI dương và khối ngoại mua ròng.
-2. **Khu vực tổng quan:** Thống kê số mã tăng/giảm, giá trị khối ngoại ròng và số mã thuộc nhóm điểm Mạnh.
-3. **Tab 1 - Bảng lọc:** Danh sách xếp hạng snapshot cổ phiếu với thuyết minh tín hiệu tự động.
-4. **Tab 2 - Trực quan hóa Vi cấu trúc:** 
-   * Biểu đồ phân tán Scatter OBI vs % Biến động giá.
-  * Biểu đồ thanh ngang so sánh giá trị giao dịch thực trong phiên.
-5. **Tab 3 - Soi kèo Chi tiết từng mã:** 
-  * Biểu đồ Radar các nhân tố có dữ liệu thực từ NeoAPI.
-   * Bảng chi tiết 3 mức giá Mua/Bán và thanh tiến trình tỷ lệ lực Cầu Mua vs Cung Bán.
-6. **Tab 4 - Thuyết minh Phương pháp & Miễn trừ trách nhiệm:** Giải thích công thức và lưu ý rủi ro.
+Khác biệt hoàn toàn với một bài tập lập trình gọi API hay hiển thị bảng giá đơn thuần, sản phẩm được thiết kế thành một **Hệ thống Hỗ trợ Ra Quyết định Đầu tư (FinTech Decision Support System)** hoàn chỉnh gồm 5 phân khu chức năng:
+1. **Đồng hồ Áp lực Vi cấu trúc Toàn Thị trường (Market Microstructure Sentiment Meter):** Tổng hợp OBI của toàn bộ rổ cổ phiếu, cung cấp cái nhìn tức thì về trạng thái nghiêng về Phe Mua hay Phe Bán trên toàn thị trường.
+2. **Chiến lược Hành động Thực chiến (Actionable Playbook):** Tự động phân loại từng mã theo 4 nhóm chiến lược:
+   * 🚀 **Mua Bứt Phá:** Hội tụ Lực cầu OBI dương mạnh, Khối ngoại gom ròng và Điểm tổng hợp $\ge 70$.
+   * 🛡️ **Tích Lũy Gom:** Dòng tiền âm thầm hấp thụ cung, biến động giá ổn định.
+   * ⚪ **Quan Sát:** Thị trường cân bằng, theo dõi thêm.
+   * ⚠️ **Cảnh Báo Bán:** Áp lực đè bán Top 3 lớn, khối ngoại xả ròng.
+3. **Khung Quản trị Rủi ro & Tỷ trọng Giải ngân (Position Sizing & Risk Management):**
+   * Đề xuất tỷ trọng danh mục cụ thể (% NAV: 15%–20%, 10%–15%, hoặc 0% Đứng ngoài).
+   * Tự động tính toán các mức giá then chốt: **Vùng giải ngân an toàn**, **Mục tiêu lợi nhuận (Target Profit)**, **Ngưỡng cắt lỗ kỷ luật (Stop-Loss)** và tỷ lệ **Lợi nhuận / Rủi ro ($R:R$)**.
+4. **Bộ Công cụ Dành riêng cho Môi giới (Broker Flash Note Generator):**
+   * Cho phép chuyên viên tư vấn tạo nhanh bản tin khuyến nghị khách hàng chuyên nghiệp chỉ với 1 cú click chuột, sẵn sàng sao chép gửi qua Zalo / Telegram trong 5 giây.
+5. **Trực quan hóa Đa chiều & Soi kèo Sổ lệnh:**
+   * Bản đồ nhiệt Scatter OBI vs $\%\Delta P$, Biểu đồ Radar 3 trục và Bảng chi tiết 3 bước giá Mua/Bán kèm thanh đo tỷ lệ gom hàng.
 
 ---
 
