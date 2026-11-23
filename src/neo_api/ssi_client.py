@@ -30,35 +30,36 @@ class SSIClient:
         self.fastconnect_url = settings.SSI_FASTCONNECT_URL.rstrip("/")
         self.session = session or requests.Session()
         self.access_token: Optional[str] = None
+        self.token_expiry: float = 0.0
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "application/json",
         }
-        # Tự động xác thực nếu người dùng đã cấu hình SSI_API_KEY và SSI_API_SECRET
-        if settings.SSI_API_KEY and settings.SSI_API_SECRET:
-            self.authenticate()
 
     def authenticate(self) -> bool:
         """
-        Xác thực với SSI FastConnect API v3 qua POST /api/v3/auth/token theo chuẩn tài liệu SSI.
-        Được kích hoạt khi người dùng cung cấp API Key và API Secret trong .env.
+        Xác thực với SSI FastConnect API v3 qua POST /api/v3/auth/token nếu người dùng cấu hình API Key & Secret.
+        Theo đúng quy chuẩn trang 12 & 23 của tài liệu SSI Developer Portal v3 (457 trang).
         """
         if not settings.SSI_API_KEY or not settings.SSI_API_SECRET:
             return False
+        if self.access_token and time.time() < self.token_expiry - 30:
+            return True
         try:
             url = f"{self.fastconnect_url}/api/v3/auth/token"
-            payload = {
-                "apiKey": settings.SSI_API_KEY,
-                "apiSecret": settings.SSI_API_SECRET,
-            }
-            resp = self.session.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=10)
-            if resp.status_code == 200:
-                data = resp.json()
-                token = data.get("accessToken")
-                if token:
-                    self.access_token = token
-                    self.headers["Authorization"] = f"Bearer {token}"
-                    return True
+            resp = self.session.post(
+                url,
+                json={"apiKey": settings.SSI_API_KEY, "apiSecret": settings.SSI_API_SECRET},
+                timeout=settings.NEO_REQUEST_TIMEOUT
+            )
+            resp.raise_for_status()
+            body = resp.json()
+            token = body.get("accessToken")
+            if token:
+                self.access_token = token
+                self.token_expiry = float(body.get("expiresAt", time.time() + 3600))
+                self.headers["Authorization"] = f"Bearer {token}"
+                return True
         except Exception:
             pass
         return False
@@ -70,6 +71,7 @@ class SSIClient:
         Args:
             universe: "VN30" (30 mã vốn hóa lớn nhất) hoặc "ALL" / "HOSE" (toàn bộ sàn HOSE)
         """
+        self.authenticate()
         universe_clean = universe.upper()
         if universe_clean == "VN30":
             url = f"{self.base_url}/stock/group/VN30"

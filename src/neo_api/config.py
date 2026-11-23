@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     )
     SSI_API_KEY: str = Field(default="", description="API Key SSI FastConnect (nếu có)")
     SSI_API_SECRET: str = Field(default="", description="API Secret SSI FastConnect (nếu có)")
+    SSI_PRIVATE_KEY: str = Field(default="", description="Private Key SSI FastConnect (nếu có)")
 
     # 3. App Settings
     APP_ENV: str = Field(default="development", description="Môi trường ứng dụng")
