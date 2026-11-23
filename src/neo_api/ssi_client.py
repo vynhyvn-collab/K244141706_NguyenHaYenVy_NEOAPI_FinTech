@@ -27,11 +27,41 @@ class SSIClient:
 
     def __init__(self, session: Optional[requests.Session] = None):
         self.base_url = settings.SSI_IBOARD_URL.rstrip("/")
+        self.fastconnect_url = settings.SSI_FASTCONNECT_URL.rstrip("/")
         self.session = session or requests.Session()
+        self.access_token: Optional[str] = None
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "application/json",
         }
+        # Tự động xác thực nếu người dùng đã cấu hình SSI_API_KEY và SSI_API_SECRET
+        if settings.SSI_API_KEY and settings.SSI_API_SECRET:
+            self.authenticate()
+
+    def authenticate(self) -> bool:
+        """
+        Xác thực với SSI FastConnect API v3 qua POST /api/v3/auth/token theo chuẩn tài liệu SSI.
+        Được kích hoạt khi người dùng cung cấp API Key và API Secret trong .env.
+        """
+        if not settings.SSI_API_KEY or not settings.SSI_API_SECRET:
+            return False
+        try:
+            url = f"{self.fastconnect_url}/api/v3/auth/token"
+            payload = {
+                "apiKey": settings.SSI_API_KEY,
+                "apiSecret": settings.SSI_API_SECRET,
+            }
+            resp = self.session.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                token = data.get("accessToken")
+                if token:
+                    self.access_token = token
+                    self.headers["Authorization"] = f"Bearer {token}"
+                    return True
+        except Exception:
+            pass
+        return False
 
     def get_market_universe(self, universe: str = "VN30") -> List[StockSnapshot]:
         """
