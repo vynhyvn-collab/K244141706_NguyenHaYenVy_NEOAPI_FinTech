@@ -19,8 +19,8 @@ class Settings(BaseSettings):
     NEO_PASSWORD: str = Field(default="", description="Mật khẩu đăng nhập VPBankS")
     NEO_ACCOUNT_NO: str = Field(default="", description="Tài khoản giao dịch VPBankS")
     NEO_WHITELIST_IP: str = Field(
-        default="14.187.239.157",
-        description="Địa chỉ IP tĩnh được đăng ký whitelist trên cổng VPBankS NeoAPI"
+        default="",
+        description="Địa chỉ IP tĩnh được đăng ký whitelist, chỉ cấu hình trong môi trường bí mật"
     )
 
     NEO_ENVIRONMENT: Literal["LIVE", "UAT"] = Field(

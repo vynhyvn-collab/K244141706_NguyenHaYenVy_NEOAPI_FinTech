@@ -152,10 +152,12 @@ except NeoApiError as exc:
 
 col_title, col_status = st.columns([2.7, 1.3])
 with col_title:
-    st.markdown('<div class="main-header">HỆ THỐNG XẾP HẠNG & HỖ TRỢ RA QUYẾT ĐỊNH ĐẦU TƯ FINTECH</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">BỘ LỌC CỔ PHIẾU THÔNG MINH ĐA NHÂN TỐ</div>', unsafe_allow_html=True)
     st.markdown(
         f'<div class="sub-header">'
-        f'Khoa Tài chính - Ngân hàng UEL | <b>100% Dữ liệu Thực tế (Zero Mock)</b> | Cập nhật: <b>{now_vn}</b>'
+        f'<b>Mục tiêu:</b> Lọc và xếp hạng cổ phiếu theo OBI sổ lệnh, thanh khoản, dòng tiền khối ngoại và động lượng trong phiên. '
+        f'<b>Người dùng:</b> Nhà đầu tư cá nhân chủ động, chuyên viên môi giới và giảng viên/người học FinTech. '
+        f'<b>Dữ liệu:</b> Thực tế, Zero Mock | Cập nhật truy vấn: <b>{now_vn}</b>'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -167,8 +169,7 @@ with col_status:
     st.markdown(f"""
     <div class="status-box">
         <b>{badge_icon} Nguồn cấp:</b> {provider_name}<br>
-        <b>🛡️ IP Whitelist:</b> <code>{conn_status['whitelisted_ip']}</code><br>
-        <b>💻 IP Trạm kết nối:</b> <code>{conn_status['current_ip']}</code><br>
+        <b>🛡️ Whitelist:</b> {'Đạt' if conn_status['is_ip_matched'] else 'Không đạt hoặc không hiển thị'}<br>
         <b>🔐 Khóa SSI FastConnect:</b> {'Đã xác thực v3' if settings.SSI_API_KEY else 'Cổng iBoard'}
     </div>
     """, unsafe_allow_html=True)
@@ -198,16 +199,16 @@ for r in ranked_results:
     # 🎯 PHÂN LOẠI CHIẾN LƯỢC HÀNH ĐỘNG THỰC CHIẾN (Actionable Playbook)
     if pd.notna(score) and score >= 70 and pd.notna(obi_value) and obi_value > 0.15:
         strategy = "🚀 Mua Bứt Phá"
-        alloc = "15% - 20% NAV"
+        alloc = "Chỉ tham khảo mô phỏng"
     elif pd.notna(score) and score >= 55 and pd.notna(obi_value) and obi_value > 0.0:
         strategy = "🛡️ Tích Lũy Gom"
-        alloc = "10% - 15% NAV"
+        alloc = "Chỉ tham khảo mô phỏng"
     elif pd.notna(obi_value) and obi_value < -0.20 or (pd.notna(score) and score < 40):
         strategy = "⚠️ Cảnh Báo Bán"
-        alloc = "0% (Đứng ngoài)"
+        alloc = "Không đề xuất giao dịch"
     else:
         strategy = "⚪ Quan Sát"
-        alloc = "0% - 5% NAV"
+        alloc = "Không đề xuất giao dịch"
 
     data_rows.append({
         "Mã CP": r.symbol,
@@ -222,7 +223,7 @@ for r in ranked_results:
         "Điểm Tổng Hợp": score,
         "Phân Hạng": r.ranking_tier,
         "Chiến lược": strategy,
-        "Tỷ trọng khuyến nghị": alloc,
+        "Trạng thái phân tích": alloc,
         "Động lượng": r.momentum_score,
         "Thanh khoản": r.liquidity_score,
         "Khối ngoại": r.foreign_score,
@@ -231,6 +232,16 @@ for r in ranked_results:
     })
 
 df_all = pd.DataFrame(data_rows)
+
+if df_all.empty:
+    st.warning("Không có dữ liệu cổ phiếu hợp lệ để phân tích trong lần cập nhật này.")
+    st.info("Ứng dụng không áp dụng điểm xếp hạng giả lập. Hãy kiểm tra kết nối API, bộ lọc universe hoặc cấu hình biến môi trường, sau đó bấm 'Làm mới dữ liệu'.")
+    st.stop()
+
+latest_timestamp = max((s.timestamp for s in snapshots if s.timestamp is not None), default=None)
+if latest_timestamp is not None:
+    latest_vn = latest_timestamp.astimezone(VN_TZ).strftime("%d/%m/%Y %H:%M:%S (UTC+7)")
+    st.caption(f"Dữ liệu snapshot gần nhất: {latest_vn}")
 
 # Áp dụng bộ lọc
 df_filtered = df_all.copy()
@@ -299,7 +310,7 @@ tab_screener, tab_viz, tab_detail, tab_broker, tab_method = st.tabs([
     "📋 Bảng Lọc & Chiến Lược Thực Chiến",
     "📈 Trực Quan Hóa Vi Cấu Trúc",
     "🔬 Soi Kèo Sổ Lệnh & Quản Trị Rủi Ro",
-    "📢 Bản Tin Tư Vấn Dành Cho Môi Giới",
+    "📢 Bản Tin Phân Tích Học Thuật",
     "📚 Phương Pháp Luận & Miễn Trừ"
 ])
 
@@ -331,7 +342,7 @@ with tab_screener:
     }
 
     display_cols = [
-        "Mã CP", "Giá (VNĐ)", "Thay đổi (%)", "Chiến lược", "Tỷ trọng khuyến nghị",
+        "Mã CP", "Giá (VNĐ)", "Thay đổi (%)", "Chiến lược", "Trạng thái phân tích",
         "Điểm Tổng Hợp", "OBI Sổ lệnh", "Khối ngoại ròng", "Tổng GTGD", "Tín hiệu phân tích"
     ]
     styled_df = df_filtered[display_cols].style.map(highlight_strategy, subset=["Chiến lược"]).format(format_dict)
@@ -397,7 +408,7 @@ with tab_detail:
             st.markdown(f"### 📌 Bóc tách Vi cấu trúc: **{selected_symbol}**")
             pct_display = f"{selected_snap.pct_change:+.2f}%" if selected_snap.pct_change is not None else "N/A"
             st.markdown(f"**Giá khớp lệnh:** `{selected_snap.last_price:,.0f} VNĐ` ({pct_display}) | **Chiến lược:** **{selected_row['Chiến lược']}**")
-            st.markdown(f"**Điểm Đa nhân tố:** **{selected_row['Điểm Tổng Hợp']} / 100** | **Tỷ trọng đề xuất:** `{selected_row['Tỷ trọng khuyến nghị']}`")
+            st.markdown(f"**Điểm Đa nhân tố:** **{selected_row['Điểm Tổng Hợp']} / 100** | **Trạng thái:** `{selected_row['Trạng thái phân tích']}`")
             st.markdown(f"**Thuyết minh:** {selected_row['Tín hiệu phân tích']}")
 
             st.markdown("#### 📖 Sổ lệnh Độ sâu 3 Bước giá (Top 3 Bids & Asks)")
@@ -422,7 +433,7 @@ with tab_detail:
                 st.progress(bid_ratio, text=f"Lực Cầu Mua Top 3: {bid_ratio:.1%} | Lực Cung Bán Top 3: {1-bid_ratio:.1%}")
 
         with col_risk:
-            st.markdown("#### 🛡️ Khung Quản Trị Rủi Ro & Kế Hoạch Vào Lệnh (Execution Playbook)")
+            st.markdown("#### 🛡️ Khung Tham Chiếu Rủi Ro (Chỉ phân tích học thuật)")
             
             p_last = selected_snap.last_price
             p_high = selected_snap.high_price or p_last
@@ -437,12 +448,13 @@ with tab_detail:
             
             st.markdown(f"""
             <div class="strategy-card">
-                <b>🎯 Kế hoạch giao dịch thực chiến:</b><br>
-                • <b>Vùng giải ngân đề xuất:</b> <code>{buy_zone} VNĐ</code><br>
-                • <b>Mục tiêu lợi nhuận ngắn hạn (Target):</b> <code style="color: #166534;">{target_price:,.0f} VNĐ (+{(target_price/p_last - 1)*100:.1f}%)</code><br>
-                • <b>Ngưỡng chặn lỗ kỷ luật (Stop-Loss):</b> <code style="color: #991B1B;">{stop_loss:,.0f} VNĐ (-{(1 - stop_loss/p_last)*100:.1f}%)</code><br>
+                <b>🎯 Khung mô phỏng tham khảo — không phải lệnh giao dịch:</b><br>
+                • <b>Vùng giá phân tích:</b> <code>{buy_zone} VNĐ</code><br>
+                • <b>Giá tham chiếu mục tiêu mô phỏng:</b> <code style="color: #166534;">{target_price:,.0f} VNĐ (+{(target_price/p_last - 1)*100:.1f}%)</code><br>
+                • <b>Ngưỡng dừng lỗ mô phỏng:</b> <code style="color: #991B1B;">{stop_loss:,.0f} VNĐ (-{(1 - stop_loss/p_last)*100:.1f}%)</code><br>
                 • <b>Tỷ lệ Lợi nhuận / Rủi ro (R:R):</b> <b>{reward_risk:.2f} : 1</b><br>
-                • <b>Tỷ trọng danh mục tối đa:</b> <b>{selected_row['Tỷ trọng khuyến nghị']}</b>
+                • <b>Trạng thái phân tích:</b> <b>{selected_row['Trạng thái phân tích']}</b><br>
+                • <b>Cam kết:</b> Hệ thống không gửi lệnh mua/bán/sửa/hủy tiền thật
             </div>
             """, unsafe_allow_html=True)
 
@@ -465,14 +477,14 @@ with tab_detail:
             fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=False, height=270, margin=dict(l=20, r=20, t=10, b=10))
             st.plotly_chart(fig_radar, use_container_width=True)
 
-# TAB 4: BẢN TIN TƯ VẤN DÀNH CHO MÔI GIỚI (BROKER TOOLKIT)
+# TAB 4: BẢN TIN PHÂN TÍCH HỌC THUẬT
 with tab_broker:
-    st.markdown("### 📢 Bộ Công Cụ Tạo Nhanh Bản Tin Tư Vấn Dành Cho Môi Giới (Broker Flash Note)")
-    st.caption("Tự động hóa hoàn toàn việc soạn thảo bản tin tư vấn khuyến nghị gửi khách hàng qua Zalo / Telegram / Email ngay trong phiên.")
+    st.markdown("### 📢 Bản Tin Phân Tích Học Thuật (Chỉ tham khảo)")
+    st.caption("Tạo bản tin mô tả dữ liệu và kết quả xếp hạng; không phải tư vấn đầu tư hoặc nội dung gửi lệnh.")
     
     col_b_sel, col_b_btn = st.columns([2, 1])
     with col_b_sel:
-        broker_symbol = st.selectbox("Chọn mã cổ phiếu cần tạo bản tin tư vấn:", df_all["Mã CP"].tolist(), key="broker_symbol_select")
+        broker_symbol = st.selectbox("Chọn mã cổ phiếu cần tạo bản tin phân tích:", df_all["Mã CP"].tolist(), key="broker_symbol_select")
     
     b_snap = snapshot_dict[broker_symbol]
     b_row = df_all[df_all["Mã CP"] == broker_symbol].iloc[0]
@@ -487,7 +499,7 @@ with tab_broker:
     obi_txt = f"{b_row['OBI Sổ lệnh']:+.1%}" if pd.notna(b_row['OBI Sổ lệnh']) else "Cân bằng"
     foreign_txt = format_currency(b_row['Khối ngoại ròng'])
     
-    flash_note_content = f"""📢 [BẢN TIN TƯ VẤN NHANH - KHUYẾN NGHỊ TRONG PHIÊN]
+    flash_note_content = f"""📢 [BẢN TIN PHÂN TÍCH HỌC THUẬT - KHÔNG PHẢI KHUYẾN NGHỊ ĐẦU TƯ]
 Mã cổ phiếu: {broker_symbol} | Sàn: {b_snap.market_code or 'HOSE'}
 Thời gian cập nhật: {now_vn}
 Giá khớp hiện tại: {b_p_last:,.0f} VNĐ ({b_snap.pct_change:+.2f}%)
@@ -498,16 +510,17 @@ Giá khớp hiện tại: {b_p_last:,.0f} VNĐ ({b_snap.pct_change:+.2f}%)
 3. Điểm Xếp hạng Đa nhân tố: {b_row['Điểm Tổng Hợp']:.1f}/100 (Nhóm {b_row['Phân Hạng']})
 --------------------------------------------------
 🎯 CHIẾN LƯỢC HÀNH ĐỘNG: {b_row['Chiến lược']}
-• Tỷ trọng khuyến nghị: {b_row['Tỷ trọng khuyến nghị']}
-• Vùng giải ngân đề xuất: {b_p_last*0.995:,.0f} - {b_p_last:,.0f} VNĐ
+• Trạng thái phân tích: {b_row['Trạng thái phân tích']}
+• Vùng giá tham khảo mô phỏng: {b_p_last*0.995:,.0f} - {b_p_last:,.0f} VNĐ
 • Mục tiêu ngắn hạn (Target): {b_target:,.0f} VNĐ (+{(b_target/b_p_last - 1)*100:.1f}%)
 • Ngưỡng chặn lỗ kỷ luật (Stop-Loss): {b_stop:,.0f} VNĐ (-{(1 - b_stop/b_p_last)*100:.1f}%)
 --------------------------------------------------
 💡 Thuyết minh: {b_row['Tín hiệu phân tích']}
+Tính chất: Công cụ phân tích học thuật; không gửi lệnh mua/bán/sửa/hủy tiền thật.
 (Nguồn: Hệ thống FinTech Smart Screener UEL | VPBankS & SSI FastConnect Data)"""
 
-    st.text_area("📄 Nội dung Bản tin Khuyến nghị (Sao chép và gửi ngay cho khách hàng):", flash_note_content, height=310)
-    st.info("💡 Môi giới chỉ cần bấm vào ô trên, nhấn `Ctrl + A` và `Ctrl + C` để gửi ngay cho các nhóm nhà đầu tư của mình.")
+    st.text_area("📄 Nội dung bản tin phân tích học thuật:", flash_note_content, height=310)
+    st.info("Nội dung chỉ dùng cho mục đích học tập, kiểm thử sản phẩm và thảo luận phân tích. Không coi là khuyến nghị đầu tư hoặc hướng dẫn đặt lệnh.")
 
 # TAB 5: PHƯƠNG PHÁP LUẬN & MIỄN TRỪ
 with tab_method:
@@ -516,8 +529,8 @@ with tab_method:
 
     Hệ thống được thiết kế theo mô hình **Sản phẩm FinTech Hỗ trợ Quyết định Đầu tư**:
     - **Không dừng lại ở việc hiển thị bảng giá đơn thuần**, hệ thống chuyển hóa dữ liệu sổ lệnh thô thành **Chiến lược Hành động Cụ thể** và **Khung Quản trị Vị thế/Rủi ro** cho từng nhà đầu tư.
-    - **Cổng chính VPBankS NeoAPI:** Tuân thủ chuẩn JWT Bearer và IP Whitelist `14.187.239.157`.
-    - **Cổng bổ sung SSI FastConnect API v3:** Tự động điều phối khi môi trường máy trạm nằm ngoài dải IP đã đăng ký, bảo đảm **100% dữ liệu thị trường thực tế** (HOSE / VN30).
+    - **Cổng chính VPBankS NeoAPI:** Tuân thủ JWT Bearer; địa chỉ whitelist được giữ trong biến môi trường.
+    - **Cổng bổ sung SSI FastConnect API v3:** Tự động điều phối khi môi trường máy trạm không đáp ứng whitelist, bảo đảm **100% dữ liệu thị trường thực tế** (HOSE / VN30).
 
     #### Các trụ cột định lượng vi cấu trúc:
     1. **Độ lệch Cung - Cầu Sổ lệnh (Order Book Imbalance - OBI):**
@@ -532,10 +545,16 @@ with tab_method:
     
     5. **Điểm tổng hợp Đa nhân tố (Composite Multi-Factor Score):**
        $$\\text{Score} = 0.30 \\cdot S_{\\text{Momentum}} + 0.25 \\cdot S_{\\text{Liquidity}} + 0.25 \\cdot S_{\\text{Foreign}} + 0.20 \\cdot S_{\\text{OBI}}$$
-    
+    #### Cơ sở và giới hạn ngưỡng
+    - OBI `> +0.20` và `< -0.20` là quy tắc mô tả áp lực mua/bán tương đối Top 3; không phải xác suất dự báo giá.
+    - Quy tắc Mua Bứt Phá (`score >= 70`, `OBI > 0.15`) và Tích Lũy Gom (`score >= 55`, `OBI > 0`) là ngưỡng nghiệp vụ minh họa, chưa được ước lượng trên dữ liệu ngoài mẫu.
+    - Quy tắc Cảnh Báo Bán (`OBI < -0.20` hoặc `score < 40`) là cảnh báo giám sát, không phải khuyến nghị đặt lệnh.
+    - Sản phẩm hiện không dùng học máy hay dự báo giá. Nó xếp hạng snapshot trong universe và không có backtest/đo lường lợi nhuận ngoài mẫu.
+    - Trọng số 30/25/25/20 là cấu hình ban đầu, chưa được tối ưu bằng hồi quy, kinh tế lượng hoặc học máy.    
     ---
     
     ### ⚠️ Khuyến cáo Rủi ro & Miễn trừ Trách nhiệm Học thuật
     - **Mục đích đồ án:** Đây là sản phẩm nghiên cứu ứng dụng công nghệ tài chính phục vụ học phần *Gói phần mềm ứng dụng cho tài chính 1* tại Trường Đại học Kinh tế - Luật (UEL).
-    - **Không phải khuyến nghị đầu tư:** Mọi dữ liệu, phân tích, xếp hạng và tín hiệu trên bảng điều khiển chỉ mang tính chất tham khảo học thuật, không cấu thành bất kỳ lời chào mua/bán hay tư vấn đầu tư tài chính tiền thật nào.
+    - **Không phải khuyến nghị đầu tư:** Mọi dữ liệu, phân tích, xếp hạng và tín hiệu chỉ mang tính chất tham khảo học thuật, không cấu thành lời chào mua/bán hay tư vấn đầu tư tiền thật.
+    - **Không phát sinh giao dịch tiền thật:** Hệ thống không cung cấp nút hoặc endpoint đặt, sửa, hủy lệnh; mọi mức vùng giá, target hoặc stop-loss chỉ là khung mô phỏng phân tích.
     """)

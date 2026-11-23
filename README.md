@@ -7,7 +7,7 @@
 * **Sinh viên thực hiện:** Nguyễn Hà Yến Vy  
 * **MSSV:** K244141706  
 * **Nền tảng dữ liệu:** VPBankS NeoAPI & SSI FastConnect API (100% Dữ liệu thực tế, 0% Mock)  
-* **Địa chỉ IP Whitelist đăng ký:** `14.187.239.157`  
+* **Bảo mật:** IP Whitelist được đọc từ biến môi trường, không công khai trong kho mã nguồn.  
 
 ---
 
@@ -49,13 +49,16 @@ Chuỗi xử lý dữ liệu tuân thủ chuẩn kiến trúc Mục 5 của đ�
            │                                                        │
            │   [Cổng Chính]                    [Cổng Bổ Sung]       │
            │   VPBankS NeoAPI                  SSI FastConnect API  │
-           │   (IP: 14.187.239.157)            (Ủy quyền người dùng)│
+           │   (Cấu hình bí mật)               (Ủy quyền người dùng) │
            └──────────┬─────────────────────────────────┬───────────┘
                       │                                 │
                       ▼                                 ▼
          [src/neo_api/client.py & src/neo_api/ssi_client.py]
-         │ (Tự động phát hiện IP máy trạm, định tuyến dữ liệu 100% Thật)
+         │ (Xác thực qua biến môi trường, định tuyến dữ liệu 100% Thật)
          ▼
+    [Chuẩn hóa/Lưu trữ: Pydantic + StockSnapshot]
+    │ (Chuẩn hóa phản hồi thành models; cache phiên trong bộ nhớ)
+    ▼
     [src/finance/indicators.py]
     │ (Tính toán chỉ báo vi cấu trúc: OBI Top 3, Intra-day Momentum, Foreign Flow)
     ▼
@@ -70,13 +73,34 @@ Chuỗi xử lý dữ liệu tuân thủ chuẩn kiến trúc Mục 5 của đ�
 
 ---
 
+## ✅ CHECKLIST ĐỐI CHIẾU TIÊU CHÍ CHẤM
+
+- [x] Nêu rõ vấn đề, người dùng, mục tiêu và giá trị tài chính.
+- [x] NEO API là nguồn chính; có JWT, pagination, chuẩn hóa Pydantic, Token Bucket 5 req/s và SSI fallback.
+- [x] Có OBI, thanh khoản, dòng tiền khối ngoại, động lượng, percentile ranking và cách diễn giải có trách nhiệm.
+- [x] Mã nguồn phân lớp, xử lý lỗi, `.env.example`, `.gitignore` và pytest.
+- [x] Dashboard có KPI, bảng, scatter, thanh khoản, gauge/radar, bộ lọc và trạng thái dữ liệu.
+- [ ] Có demo video chưa chứa bí mật: `K244141706_NguyenHaYenVy_Demo.mp4`.
+- [ ] Có kết quả live trong phiên được cấp quyền; unit test hiện đủ 9 ca nhưng chưa thay thế kiểm chứng API thực.
+- [ ] Chưa được backtest ngoài mẫu; các ngưỡng/chất lượng không nên được tuyên bố là lợi nhuận dự báo.
+
+---
+
+## ⚖️ LIÊM CHÍNH HỌC THUẬT & TRÁCH NHIỆM NỘI DUNG
+
+Sinh viên chịu trách nhiệm về mã nguồn, công thức, kết quả, trích dẫn và toàn bộ nội dung nộp. Tài liệu/thư viện bên ngoài được ghi nguồn theo thông lệ học thuật; dữ liệu thực không được thay bằng dữ liệu giả để làm đẹp kết quả.
+
+Các fixture trong `tests/` chỉ dùng để kiểm chứng logic và được công bố là dữ liệu kiểm thử, không được xem là dữ liệu thị trường. Công cụ AI có thể hỗ trợ lập trình và biên tập; đầu ra AI không thay công thức tài chính, không được trình bày như sự thật đã kiểm chứng và hiện chưa được dùng để sinh kết luận thị trường.
+
+---
+
 ## 🔒 BẢO MẬT, ĐỊA CHỈ IP WHITELIST & QUY TẮC DỮ LIỆU THẬT
 
 1. **Cam kết 100% Dữ liệu Thật (Zero Mock):** Loại bỏ hoàn toàn mọi thuật toán sinh số ngẫu nhiên hoặc giả lập (`np.random`, `Math.random`). Tất cả giá trị giao dịch, bước giá sổ lệnh, khối lượng khớp và giao dịch khối ngoại đều là dữ liệu thực tế từ HOSE / VN30.
-2. **Cơ chế Bảo mật IP Whitelist:** 
-   - VPBankS NeoAPI quy định nghiêm ngặt kiểm tra địa chỉ IP vật lý của máy trạm kết nối (`14.187.239.157`).
-   - Khi chạy trên máy trạm có IP `14.187.239.157`, hệ thống kết nối trực tiếp với VPBankS NeoAPI qua giao thức Bearer JWT (`POST /auth/token`).
-   - Khi chạy từ môi trường ngoài dải IP đã đăng ký, hệ thống tự động định tuyến sang cổng bổ sung **SSI FastConnect API** được người dùng ủy quyền, đảm bảo hệ thống luôn hoạt động thông suốt với dữ liệu thực tế.
+2. **Cơ chế Bảo mật IP Whitelist:**
+   - Cấu hình IP được đặt trong biến môi trường `NEO_WHITELIST_IP`, không ghi cứng hoặc xuất bản cụ thể.
+   - Khi trạm kết nối đáp ứng whitelist, hệ thống truy cập VPBankS NeoAPI bằng JWT Bearer (`POST /auth/token`).
+   - Khi trạm không đáp ứng điều kiện whitelist, hệ thống có thể định tuyến sang cổng bổ sung **SSI FastConnect API** được người dùng ủy quyền.
 3. **Tuân thủ Rate Limit:** Tích hợp bộ điều phối tốc độ `Token Bucket RateLimiter` giới hạn nghiêm ngặt **5 requests/giây**, bảo vệ hạ tầng NeoAPI theo quy định của VPBankS.
 4. **An toàn bảo mật:** Thông tin tài khoản được tách biệt trong `.env` (mẫu tại `.env.example`), không commit thông tin nhạy cảm lên Git.
 
@@ -90,7 +114,7 @@ Tạo tệp `.env` tại thư mục gốc với các thông số cấu hình:
 NEO_USERNAME=your_vpbanks_username
 NEO_PASSWORD=your_vpbanks_password
 NEO_ACCOUNT_NO=your_account_number
-NEO_WHITELIST_IP=14.187.239.157
+NEO_WHITELIST_IP=your_registered_private_ip
 NEO_ENVIRONMENT=LIVE
 NEO_API_BASE_URL=https://neoapi.vpbanks.com.vn/neo-api
 NEO_AUTH_URL=https://external.vpbanks.com.vn/auth/token

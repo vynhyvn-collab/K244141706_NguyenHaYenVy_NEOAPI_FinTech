@@ -46,7 +46,7 @@ class RateLimiter:
 class NeoApiClient:
     """
     Client kết nối dữ liệu thị trường thông minh:
-    - Kênh chính: VPBankS NeoAPI (vận hành với JWT Bearer và IP Whitelist 14.187.239.157).
+    - Kênh chính: VPBankS NeoAPI (vận hành bằng JWT Bearer và whitelist cấu hình qua biến môi trường).
     - Kênh bổ sung: SSI FastConnect API (tự động điều phối khi phát hiện khác biệt IP trạm làm việc).
     """
 
@@ -72,9 +72,9 @@ class NeoApiClient:
             if resp.status_code == 200:
                 self.current_ip = resp.json().get("ip", "Unknown")
             else:
-                self.current_ip = "113.161.66.12"
+                self.current_ip = "Không xác định"
         except Exception:
-            self.current_ip = "113.161.66.12"
+            self.current_ip = "Không xác định"
         return self.current_ip
 
     def authenticate(self) -> bool:
@@ -147,8 +147,8 @@ class NeoApiClient:
         """
         Tải toàn bộ snapshot cổ phiếu từ thị trường thực tế:
         1. Thử nghiệm kết nối trực tiếp với VPBankS NeoAPI.
-        2. Nếu phát hiện rào cản IP Whitelist (khác địa chỉ 14.187.239.157), tự động chuyển
-           sang kênh dữ liệu bổ sung SSI FastConnect API để đảm bảo luồng hoạt động 100% dữ liệu thật.
+        2. Nếu phát hiện rào cản IP Whitelist, tự động chuyển sang kênh dữ liệu
+           bổ sung SSI FastConnect API để đảm bảo luồng hoạt động 100% dữ liệu thật.
         """
         curr_ip = self.detect_public_ip()
         snapshots: List[StockSnapshot] = []
