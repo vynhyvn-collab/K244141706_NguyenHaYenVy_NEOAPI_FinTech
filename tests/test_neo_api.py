@@ -173,11 +173,12 @@ def test_ssi_client_parsing():
 
 def test_neo_client_connection_status_and_ip_whitelisting(monkeypatch):
     configure_credentials(monkeypatch)
+    monkeypatch.setattr(settings, "NEO_WHITELIST_IP", "192.0.2.1")
     client = NeoApiClient(session=SessionStub())
-    client.current_ip = "14.187.239.157"
+    client.current_ip = "192.0.2.1"
     status = client.get_connection_status()
 
-    assert status["whitelisted_ip"] == "14.187.239.157"
-    assert status["current_ip"] == "14.187.239.157"
+    assert status["whitelisted_ip"] == "192.0.2.1"
+    assert status["current_ip"] == "192.0.2.1"
     assert status["is_ip_matched"] is True
     assert "100%" in status["data_quality"]
