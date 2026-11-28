@@ -158,6 +158,8 @@ class NeoApiClient:
             self.authenticate()
             if universe.upper() == "VN30":
                 endpoint, base_params = "stock/stockDetailByIndex", {"indexCode": "VN30"}
+            elif universe.upper() in ("HOSE", "HNX", "UPCOM"):
+                endpoint, base_params = "stock/stockDetail", {"marketCode": universe.upper()}
             else:
                 endpoint, base_params = "stock/stockDetail", {"marketCode": "ALL"}
 

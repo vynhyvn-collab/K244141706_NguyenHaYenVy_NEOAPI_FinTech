@@ -113,12 +113,36 @@ with st.sidebar:
     st.markdown("---")
     
     st.subheader("⚙️ Nguồn dữ liệu & Bảo mật")
+    universe_options = [
+        "ALL (100% Toàn bộ Thị trường: HOSE, HNX, UPCOM)",
+        "VN30 (30 Cổ phiếu Lớn nhất HOSE)",
+        "HOSE (Sở GDCK TP.HCM)",
+        "HNX (Sở GDCK Hà Nội)",
+        "UPCOM (Thị trường Đăng ký Giao dịch)",
+    ]
     universe_choice = st.selectbox(
         "Phạm vi dữ liệu thị trường:",
-        ["VN30 (30 Cổ phiếu Lớn nhất)", "ALL (Toàn bộ Sàn HOSE)"],
-        index=0 if settings.DEFAULT_UNIVERSE == "VN30" else 1,
+        universe_options,
+        index=0 if settings.DEFAULT_UNIVERSE == "ALL" else 1,
     )
-    universe_key = "VN30" if "VN30" in universe_choice else "ALL"
+    if "VN30" in universe_choice:
+        universe_key = "VN30"
+    elif "HOSE" in universe_choice and "100%" not in universe_choice:
+        universe_key = "HOSE"
+    elif "HNX" in universe_choice:
+        universe_key = "HNX"
+    elif "UPCOM" in universe_choice:
+        universe_key = "UPCOM"
+    else:
+        universe_key = "ALL"
+
+    filter_exchange = None
+    if universe_key == "ALL":
+        filter_exchange = st.multiselect(
+            "Lọc theo Sàn niêm yết:",
+            options=["HOSE", "HNX", "UPCOM"],
+            default=["HOSE", "HNX", "UPCOM"]
+        )
 
     st.markdown("---")
     st.subheader("🎯 Chiến lược Phân bổ & Bộ lọc")
@@ -255,6 +279,8 @@ if filter_obi_positive:
     df_filtered = df_filtered[df_filtered["OBI Sổ lệnh"] > 0]
 if filter_foreign_buy:
     df_filtered = df_filtered[df_filtered["Khối ngoại ròng"] > 0]
+if filter_exchange:
+    df_filtered = df_filtered[df_filtered["Sàn"].isin(filter_exchange)]
 
 # --- METRIC CARDS & ĐỒNG HỒ ÁP LỰC VI CẤU TRÚC TOÀN THỊ TRƯỜNG ---
 st.markdown("### 📊 Tổng quan Áp lực Vi cấu trúc & Sức mạnh Dòng tiền")
@@ -305,18 +331,17 @@ with col_m3:
 
 st.markdown("---")
 
-# --- TABS GIAO DIỆN CHÍNH ---
-tab_screener, tab_viz, tab_detail, tab_broker, tab_method = st.tabs([
-    "📋 Bảng Lọc & Chiến Lược Thực Chiến",
-    "📈 Trực Quan Hóa Vi Cấu Trúc",
-    "🔬 Soi Kèo Sổ Lệnh & Quản Trị Rủi Ro",
-    "📢 Bản Tin Phân Tích Học Thuật",
-    "📚 Phương Pháp Luận & Miễn Trừ"
-])
+# --- TAB GIAO DIỆN DUY NHẤT (ALL-IN-ONE UNIFIED DASHBOARD) ---
+tab_unified = st.tabs([
+    "📊 BẢNG ĐIỀU KHIỂN ĐỊNH LƯỢNG TOÀN THỊ TRƯỜNG & HỖ TRỢ RA QUYẾT ĐỊNH"
+])[0]
 
-# TAB 1: BẢNG LỌC REALTIME
-with tab_screener:
-    st.subheader(f"Bảng Lọc Cổ phiếu Định Lượng & Chiến Lược Hành Động ({len(df_filtered)} / {len(df_all)} mã)")
+with tab_unified:
+    # -------------------------------------------------------------
+    # PHẦN 1: BẢNG LỌC CỔ PHIẾU ĐỊNH LƯỢNG & CHIẾN LƯỢC THỰC CHIẾN
+    # -------------------------------------------------------------
+    st.markdown("### 📋 Phần 1: Bảng Lọc Cổ Phiếu Định Lượng & Chiến Lược Thực Chiến")
+    st.caption(f"Đang hiển thị {len(df_filtered)} / {len(df_all)} mã thỏa mãn tiêu chí lọc từ dữ liệu thị trường thực tế.")
     
     def highlight_strategy(val):
         if "Mua Bứt Phá" in str(val):
@@ -342,15 +367,19 @@ with tab_screener:
     }
 
     display_cols = [
-        "Mã CP", "Giá (VNĐ)", "Thay đổi (%)", "Chiến lược", "Trạng thái phân tích",
+        "Mã CP", "Sàn", "Giá (VNĐ)", "Thay đổi (%)", "Chiến lược", "Trạng thái phân tích",
         "Điểm Tổng Hợp", "OBI Sổ lệnh", "Khối ngoại ròng", "Tổng GTGD", "Tín hiệu phân tích"
     ]
     styled_df = df_filtered[display_cols].style.map(highlight_strategy, subset=["Chiến lược"]).format(format_dict)
     st.dataframe(styled_df, use_container_width=True, height=480)
-    st.caption("💡 Mẹo: Bấm vào tiêu đề cột để sắp xếp theo Điểm Tổng Hợp, OBI Sổ lệnh hoặc Khối ngoại.")
+    st.caption("💡 Mẹo: Bấm vào tiêu đề cột để sắp xếp theo Điểm Tổng Hợp, Sàn, OBI Sổ lệnh hoặc Khối ngoại.")
 
-# TAB 2: TRỰC QUAN HÓA VI CẤU TRÚC
-with tab_viz:
+    st.markdown("---")
+
+    # -------------------------------------------------------------
+    # PHẦN 2: TRỰC QUAN HÓA VI CẤU TRÚC TOÀN THỊ TRƯỜNG
+    # -------------------------------------------------------------
+    st.markdown("### 📈 Phần 2: Trực Quan Hóa Vi Cấu Trúc Toàn Thị Trường")
     col_chart1, col_chart2 = st.columns(2)
     
     with col_chart1:
@@ -362,7 +391,7 @@ with tab_viz:
             size="Điểm Tổng Hợp",
             color="Chiến lược",
             hover_name="Mã CP",
-            hover_data=["Giá (VNĐ)", "Tổng GTGD"],
+            hover_data=["Giá (VNĐ)", "Tổng GTGD", "Sàn"],
             color_discrete_map={
                 "🚀 Mua Bứt Phá": "#16A34A",
                 "🛡️ Tích Lũy Gom": "#0284C7",
@@ -391,8 +420,12 @@ with tab_viz:
         st.plotly_chart(fig_bar, use_container_width=True)
         st.caption("Màu sắc thể hiện Điểm Tổng Hợp đa nhân tố; độ cao cột thể hiện quy mô thanh khoản tiền thật.")
 
-# TAB 3: SOI KÈO SỔ LỆNH & QUẢN TRỊ RỦI RO
-with tab_detail:
+    st.markdown("---")
+
+    # -------------------------------------------------------------
+    # PHẦN 3: SOI KÈO SỔ LỆNH CHI TIẾT & KHUNG QUẢN TRỊ RỦI RO
+    # -------------------------------------------------------------
+    st.markdown("### 🔬 Phần 3: Soi Kèo Sổ Lệnh Chi Tiết & Khung Quản Trị Rủi Ro")
     col_sel, col_empty = st.columns([1, 2])
     with col_sel:
         symbol_list = df_all["Mã CP"].tolist()
@@ -405,13 +438,13 @@ with tab_detail:
         col_info, col_risk = st.columns([1.1, 0.9])
 
         with col_info:
-            st.markdown(f"### 📌 Bóc tách Vi cấu trúc: **{selected_symbol}**")
+            st.markdown(f"#### 📌 Bóc tách Vi cấu trúc: **{selected_symbol}** (Sàn {selected_snap.market_code or 'HOSE'})")
             pct_display = f"{selected_snap.pct_change:+.2f}%" if selected_snap.pct_change is not None else "N/A"
             st.markdown(f"**Giá khớp lệnh:** `{selected_snap.last_price:,.0f} VNĐ` ({pct_display}) | **Chiến lược:** **{selected_row['Chiến lược']}**")
             st.markdown(f"**Điểm Đa nhân tố:** **{selected_row['Điểm Tổng Hợp']} / 100** | **Trạng thái:** `{selected_row['Trạng thái phân tích']}`")
             st.markdown(f"**Thuyết minh:** {selected_row['Tín hiệu phân tích']}")
 
-            st.markdown("#### 📖 Sổ lệnh Độ sâu 3 Bước giá (Top 3 Bids & Asks)")
+            st.markdown("##### 📖 Sổ lệnh Độ sâu 3 Bước giá (Top 3 Bids & Asks)")
             ob = selected_snap.order_book
             bid_levels = ob.bids if ob else []
             ask_levels = ob.asks if ob else []
@@ -477,9 +510,12 @@ with tab_detail:
             fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=False, height=270, margin=dict(l=20, r=20, t=10, b=10))
             st.plotly_chart(fig_radar, use_container_width=True)
 
-# TAB 4: BẢN TIN PHÂN TÍCH HỌC THUẬT
-with tab_broker:
-    st.markdown("### 📢 Bản Tin Phân Tích Học Thuật (Chỉ tham khảo)")
+    st.markdown("---")
+
+    # -------------------------------------------------------------
+    # PHẦN 4: BẢN TIN PHÂN TÍCH HỌC THUẬT (BROKER FLASH NOTE)
+    # -------------------------------------------------------------
+    st.markdown("### 📢 Phần 4: Bản Tin Phân Tích Học Thuật (Broker Flash Note)")
     st.caption("Tạo bản tin mô tả dữ liệu và kết quả xếp hạng; không phải tư vấn đầu tư hoặc nội dung gửi lệnh.")
     
     col_b_sel, col_b_btn = st.columns([2, 1])
@@ -522,15 +558,18 @@ Tính chất: Công cụ phân tích học thuật; không gửi lệnh mua/bán
     st.text_area("📄 Nội dung bản tin phân tích học thuật:", flash_note_content, height=310)
     st.info("Nội dung chỉ dùng cho mục đích học tập, kiểm thử sản phẩm và thảo luận phân tích. Không coi là khuyến nghị đầu tư hoặc hướng dẫn đặt lệnh.")
 
-# TAB 5: PHƯƠNG PHÁP LUẬN & MIỄN TRỪ
-with tab_method:
+    st.markdown("---")
+
+    # -------------------------------------------------------------
+    # PHẦN 5: PHƯƠNG PHÁP LUẬN ĐỊNH LƯỢNG & MIỄN TRỪ TRÁCH NHIỆM
+    # -------------------------------------------------------------
     st.markdown("""
-    ### 📐 Kiến trúc Đa nguồn & Cơ sở Khoa học Tài chính
+    ### 📚 Phần 5: Phương Pháp Luận Định Lượng & Miễn Trừ Trách Nhiệm Học Thuật
 
     Hệ thống được thiết kế theo mô hình **Sản phẩm FinTech Hỗ trợ Quyết định Đầu tư**:
     - **Không dừng lại ở việc hiển thị bảng giá đơn thuần**, hệ thống chuyển hóa dữ liệu sổ lệnh thô thành **Chiến lược Hành động Cụ thể** và **Khung Quản trị Vị thế/Rủi ro** cho từng nhà đầu tư.
     - **Cổng chính VPBankS NeoAPI:** Tuân thủ JWT Bearer; địa chỉ whitelist được giữ trong biến môi trường.
-    - **Cổng bổ sung SSI FastConnect API v3:** Tự động điều phối khi môi trường máy trạm không đáp ứng whitelist, bảo đảm **100% dữ liệu thị trường thực tế** (HOSE / VN30).
+    - **Cổng bổ sung SSI FastConnect API v3:** Tự động điều phối khi môi trường máy trạm không đáp ứng whitelist, bảo đảm **100% dữ liệu thị trường thực tế** (HOSE, HNX, UPCOM, VN30).
 
     #### Các trụ cột định lượng vi cấu trúc:
     1. **Độ lệch Cung - Cầu Sổ lệnh (Order Book Imbalance - OBI):**
@@ -545,7 +584,8 @@ with tab_method:
     
     5. **Điểm tổng hợp Đa nhân tố (Composite Multi-Factor Score):**
        $$\\text{Score} = 0.30 \\cdot S_{\\text{Momentum}} + 0.25 \\cdot S_{\\text{Liquidity}} + 0.25 \\cdot S_{\\text{Foreign}} + 0.20 \\cdot S_{\\text{OBI}}$$
-    #### Cơ sở và giới hạn ngưỡng
+
+    #### Cơ sở và giới hạn ngưỡng:
     - OBI `> +0.20` và `< -0.20` là quy tắc mô tả áp lực mua/bán tương đối Top 3; không phải xác suất dự báo giá.
     - Quy tắc Mua Bứt Phá (`score >= 70`, `OBI > 0.15`) và Tích Lũy Gom (`score >= 55`, `OBI > 0`) là ngưỡng nghiệp vụ minh họa, chưa được ước lượng trên dữ liệu ngoài mẫu.
     - Quy tắc Cảnh Báo Bán (`OBI < -0.20` hoặc `score < 40`) là cảnh báo giám sát, không phải khuyến nghị đặt lệnh.

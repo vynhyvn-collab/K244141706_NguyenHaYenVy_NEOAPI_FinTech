@@ -69,47 +69,58 @@ class SSIClient:
         Lấy danh sách snapshot cổ phiếu từ thị trường thật.
         
         Args:
-            universe: "VN30" (30 mã vốn hóa lớn nhất) hoặc "ALL" / "HOSE" (toàn bộ sàn HOSE)
+            universe: "VN30" (30 mã vốn hóa lớn nhất), "HOSE", "HNX", "UPCOM", hoặc 
+                      "ALL" (toàn bộ 100% các mã cổ phiếu đang giao dịch trên cả 3 sàn).
         """
         self.authenticate()
         universe_clean = universe.upper()
+        
+        endpoints: List[tuple[str, str]] = []
         if universe_clean == "VN30":
-            url = f"{self.base_url}/stock/group/VN30"
+            endpoints = [(f"{self.base_url}/stock/group/VN30", "HOSE")]
+        elif universe_clean == "HOSE":
+            endpoints = [(f"{self.base_url}/stock/exchange/hose", "HOSE")]
+        elif universe_clean == "HNX":
+            endpoints = [(f"{self.base_url}/stock/exchange/hnx", "HNX")]
+        elif universe_clean == "UPCOM":
+            endpoints = [(f"{self.base_url}/stock/exchange/upcom", "UPCOM")]
         else:
-            url = f"{self.base_url}/stock/exchange/hose"
-
-        try:
-            response = self.session.get(url, headers=self.headers, timeout=settings.NEO_REQUEST_TIMEOUT)
-            response.raise_for_status()
-            data = response.json()
-        except (requests.RequestException, ValueError) as exc:
-            raise SSIClientError(f"Không thể kết nối SSI API ({url}): {exc}") from exc
-
-        if not isinstance(data, dict) or data.get("code") != "SUCCESS":
-            raise SSIClientError(f"Phản hồi SSI không hợp lệ: {data.get('message', 'Unknown error')}")
-
-        items = data.get("data", [])
-        if not isinstance(items, list) or not items:
-            raise SSIClientError(f"SSI API không trả về dữ liệu danh mục cho {universe}.")
+            # "ALL": Lấy trọn vẹn 100% toàn bộ thị trường Việt Nam (HOSE + HNX + UPCOM)
+            endpoints = [
+                (f"{self.base_url}/stock/exchange/hose", "HOSE"),
+                (f"{self.base_url}/stock/exchange/hnx", "HNX"),
+                (f"{self.base_url}/stock/exchange/upcom", "UPCOM"),
+            ]
 
         snapshots: List[StockSnapshot] = []
-        for item in items:
-            if not isinstance(item, dict):
-                continue
+        errors: List[str] = []
+
+        for url, default_market in endpoints:
             try:
-                snap = self._parse_stock(item)
-                if snap:
-                    snapshots.append(snap)
-            except Exception:
-                # Bỏ qua bản ghi lỗi cấu trúc cục bộ để đảm bảo toàn vẹn dữ liệu
-                continue
+                response = self.session.get(url, headers=self.headers, timeout=settings.NEO_REQUEST_TIMEOUT)
+                response.raise_for_status()
+                data = response.json()
+                if not isinstance(data, dict) or data.get("code") != "SUCCESS":
+                    errors.append(f"{url}: {data.get('message', 'Non-success response')}")
+                    continue
+                items = data.get("data", [])
+                if isinstance(items, list):
+                    for item in items:
+                        if isinstance(item, dict):
+                            snap = self._parse_stock(item, default_market=default_market)
+                            if snap:
+                                snapshots.append(snap)
+            except Exception as exc:
+                errors.append(f"{url}: {exc}")
 
         if not snapshots:
-            raise SSIClientError(f"Không có mã cổ phiếu hợp lệ nào từ SSI cho {universe}.")
+            raise SSIClientError(
+                f"Không thể lấy dữ liệu SSI cho danh mục {universe}. Chi tiết lỗi: {'; '.join(errors)}"
+            )
 
         return snapshots
 
-    def _parse_stock(self, item: Dict[str, Any]) -> Optional[StockSnapshot]:
+    def _parse_stock(self, item: Dict[str, Any], default_market: str = "HOSE") -> Optional[StockSnapshot]:
         """Ánh xạ một bản ghi cổ phiếu từ SSI sang định dạng chuẩn StockSnapshot."""
         symbol = str(item.get("stockSymbol") or "").strip()
         if not symbol:
@@ -171,7 +182,10 @@ class SSIClient:
 
         # 3. Trích xuất Giá và Khối lượng giao dịch
         ref_price = to_float(item.get("refPrice")) or 0.0
-        last_price = to_float(item.get("matchedPrice")) or ref_price
+        last_price = to_float(item.get("matchedPrice"))
+        if not last_price or last_price <= 0:
+            last_price = ref_price
+
         price_change = to_float(item.get("priceChange"))
         if price_change is None:
             price_change = last_price - ref_price if (last_price and ref_price) else 0.0
@@ -185,6 +199,10 @@ class SSIClient:
 
         admin_status = str(item.get("adminStatus") or "NRM").upper()
         trading_status = "NORMAL" if admin_status in ("NRM", "NORMAL") else admin_status
+
+        # Xác định sàn niêm yết chuẩn
+        exchange_raw = item.get("exchange") or default_market
+        market_code = str(exchange_raw).upper()
 
         return StockSnapshot(
             symbol=symbol,
@@ -203,7 +221,7 @@ class SSIClient:
             pct_change=pct_change,
             order_book=order_book,
             foreign_trade=foreign_trade,
-            market_code="HOSE",
+            market_code=market_code,
             stock_type="ST",
             trading_status=trading_status,
         )

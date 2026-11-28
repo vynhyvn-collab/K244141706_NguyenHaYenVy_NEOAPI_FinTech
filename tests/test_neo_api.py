@@ -170,6 +170,11 @@ def test_ssi_client_parsing():
     assert s.foreign_trade.net_value == (13350690000 - 14589059350)
     assert s.trading_status == "NORMAL"
 
+    # Kiểm tra quét toàn bộ 100% thị trường ("ALL") qua cả 3 sàn
+    all_snapshots = client.get_market_universe("ALL")
+    assert len(all_snapshots) == 3  # 1 mã từ HOSE, 1 từ HNX, 1 từ UPCOM stub
+    assert all_snapshots[0].symbol == "ACB"
+
 
 def test_neo_client_connection_status_and_ip_whitelisting(monkeypatch):
     configure_credentials(monkeypatch)

@@ -5,145 +5,40 @@
 * **Khoa:** Tài chính - Ngân hàng  
 * **Học phần:** Gói phần mềm ứng dụng cho tài chính 1 (Mã lớp: 261BFF401101 / 261BFF401102)  
 * **Sinh viên thực hiện:** Nguyễn Hà Yến Vy | **MSSV:** K244141706  
-* **Nền tảng hạ tầng:** VPBankS NeoAPI & SSI FastConnect API v3 (100% Dữ liệu thực tế, 0% Mock)  
+* **Nền tảng hạ tầng:** VPBankS NeoAPI & SSI FastConnect API v3 (100% Dữ liệu thực tế, Zero Mock)  
 * **Nguyên tắc an toàn:** Tuyệt đối không lưu trữ khóa bí mật, mật khẩu hay địa chỉ IP riêng tư trên Git.
 
 ---
 
-## 👨‍🏫 HƯỚNG DẪN DÀNH CHO GIẢNG VIÊN CHẤM ĐỒ ÁN (GRADING & EXECUTION GUIDE)
+## 👨‍🏫 HƯỚNG DẪN DÀNH CHO GIẢNG VIÊN VÀ NHÀ ĐẦU TƯ: CẤU HÌNH TÀI KHOẢN RIÊNG QUA TỆP `.env` (TỪ `.env.example`)
 
-Để tạo thuận lợi tối đa cho Quý Thầy/Cô trong quá trình kiểm tra và đánh giá sản phẩm, dự án đã được thiết kế và kiểm thử sẵn sàng theo 3 phương thức vận hành:
+Để bảo đảm tính bảo mật tối đa và trao toàn quyền kiểm soát tham số môi trường cho Quý Thầy/Cô và Nhà đầu tư khi thử nghiệm hệ thống bằng tài khoản cá nhân, dự án vận hành thông qua cơ chế cấu hình biến môi trường chuẩn quốc tế bằng tệp `.env`.
 
-### 🚀 Phương thức 1: Khởi chạy Dashboard trực tiếp (Khuyến nghị - Chạy ngay trong 1 dòng lệnh)
-Giảng viên chỉ cần mở PowerShell (hoặc Terminal) tại thư mục dự án và chạy dòng lệnh:
+### 📋 Quy trình 5 Bước Khởi chạy Dự án:
 
-```powershell
-# Chạy với môi trường ảo có sẵn của dự án:
-$env:PYTHONPATH="."; .\.venv\Scripts\streamlit.exe run src/app/main.py
-```
-*(Hoặc nếu chạy với môi trường Python chung của máy: `streamlit run src/app/main.py`)*
-
-> **Điểm nổi bật:** Trình duyệt sẽ tự động mở tại `http://localhost:8501`. Giảng viên **không cần điền bất kỳ tài khoản hay mật khẩu nào**; hệ thống sẽ tự động kích hoạt kênh dữ liệu thị trường thực tế (HOSE / VN30) để hiển thị đầy đủ các tính năng phân tích vi cấu trúc, sổ lệnh Top 3 và khuyến nghị môi giới.
-
----
-
-### 🧪 Phương thức 2: Chạy toàn bộ Bộ Kiểm thử Tự động (Unit Test Suite)
-Để kiểm chứng tính đúng đắn của toàn bộ logic tài chính, công thức vi cấu trúc (OBI, Momentum, Foreign Flow) và cơ chế điều phối an toàn:
+#### Bước 1: Sao chép tệp mẫu `.env.example` thành `.env`
+Mở PowerShell (hoặc Terminal) tại thư mục gốc của dự án và chạy lệnh:
 
 ```powershell
-# Chạy kiểm thử tự động với pytest:
-$env:PYTHONPATH="."; .\.venv\Scripts\pytest.exe -v
+# Trên Windows PowerShell:
+Copy-Item .env.example .env
+
+# Hoặc trên Command Prompt (cmd) / Bash:
+# copy .env.example .env     (cmd)
+# cp .env.example .env       (bash)
 ```
 
-> **Kết quả kiểm chứng:** Toàn bộ **9/9 Unit Tests** đạt **100% Passed** trong ~1 giây, kiểm thử độc lập mà không cần kết nối mạng bên ngoài, chứng minh mã nguồn ổn định và tái lập kết quả dễ dàng.
+#### Bước 2: Điền thông tin tài khoản cá nhân vào tệp `.env`
+Mở tệp `.env` vừa tạo bằng trình soạn thảo văn bản (Notepad, VS Code,...) và cấu hình các trường thông tin:
 
----
-
-### 🔑 Phương thức 3: Cấu hình Tài khoản Riêng (Tùy chọn dành cho Giảng viên / Chuyên viên)
-Nếu Quý Thầy/Cô có tài khoản VPBankS NeoAPI hoặc SSI FastConnect API v3 riêng và muốn kiểm tra luồng xác thực:
-1. Sao chép tệp mẫu `.env.example` thành `.env`:
-   ```powershell
-   cp .env.example .env
-   ```
-2. Điền thông tin tài khoản vào `.env` (xem hướng dẫn ở Mục 4 bên dưới).
-3. Khởi chạy lại Streamlit; hệ thống sẽ tự động xác thực JWT Bearer chính thức với máy chủ.
-
----
-
-## 🔒 CAM KẾT AN TOÀN VÀ QUYỀN RIÊNG TƯ (SECURITY & PRIVACY BY DESIGN)
-
-Tuân thủ nghiêm ngặt quy định an toàn thông tin của đề tài:
-1. **Không đưa dữ liệu nhạy cảm lên kho mã nguồn:** Tuyệt đối không hardcode tên đăng nhập, mật khẩu, API Key, API Secret, Private Key hay địa chỉ IP riêng tư trong mã nguồn, báo cáo hoặc tài liệu công khai.
-2. **Cơ chế Quản lý Bí mật (.env & .gitignore):** 
-   * Toàn bộ thông tin nhạy cảm được cô lập trong tệp `.env` cục bộ trên máy trạm của người dùng.
-   * Tệp `.env` đã được đưa vào `.gitignore`, đảm bảo không bao giờ bị đẩy lên GitHub.
-   * Dự án chỉ cung cấp tệp [.env.example](file:///.env.example) chứa các biến giả định (placeholders) để hướng dẫn cấu hình.
-3. **An toàn Giao dịch (Read-Only Mode):** 
-   * Sản phẩm chỉ khai thác quyền đọc dữ liệu thị trường (Market Data Read-Only), hoàn toàn không tích hợp tính năng đặt lệnh tiền thật, đảm bảo an toàn 100% cho tài sản của người dùng.
-4. **Bảo vệ Hạ tầng (Rate Limiting 5 RPS):**
-   * Tích hợp bộ điều phối `TokenBucket RateLimiter` giới hạn nghiêm ngặt 5 requests/giây, không bao giờ gây quá tải cho máy chủ của đối tác.
-
----
-
-## 📖 GIỚI THIỆU BÀI TOÁN & GIÁ TRỊ THỰC TIỄN CHO NGƯỜI DÙNG
-
-### 1. Vấn đề thực tế trong ngành chứng khoán:
-* **Hạn chế của phân tích kỹ thuật truyền thống:** Các chỉ báo phổ biến (MA, RSI, MACD) chỉ tính trên giá đóng cửa quá khứ nên có độ trễ lớn. Khi phát tín hiệu Mua, giá thường đã tăng mạnh, khiến nhà đầu tư chịu rủi ro trượt giá và rủi ro chu kỳ T+2.5.
-* **Quá tải bảng điện:** Hơn 1.600 mã cổ phiếu biến động từng giây, nhà đầu tư không thể theo dõi thủ công để tìm dấu vết dòng tiền lớn gom hàng.
-* **Khoảng cách công nghệ:** Dữ liệu độ sâu sổ lệnh (Top 3 Bids/Asks) và Độ lệch Cung - Cầu (Order Book Imbalance - OBI) trước đây chỉ có trên các hệ thống đắt đỏ như Bloomberg/Refinitiv.
-
-### 2. Định vị Người dùng mục tiêu:
-* **Nhà đầu tư cá nhân chủ động (Active Trader):** Cần quét nhanh toàn thị trường dưới 1 giây, nhận diện các mã có bên Mua gom áp đảo kèm khối ngoại mua ròng, và có kế hoạch vào lệnh cụ thể (Vùng mua, Stop-loss, Target, R:R).
-* **Môi giới chứng khoán & Chuyên viên tư vấn (Broker / Wealth Advisor):** Cần công cụ tạo ngay **Bản tin Khuyến nghị Khách hàng 1-Click (Broker Flash Note)** để sao chép gửi vào Zalo / Telegram cho khách hàng trong 5 giây.
-
----
-
-## 🖥️ HƯỚNG DẪN ĐÁNH GIÁ 5 PHÂN KHU CHỨC NĂNG TRÊN DASHBOARD
-
-Khi mở Dashboard tại `http://localhost:8501`, Giảng viên có thể tương tác trực tiếp với các phân khu:
-
-1. **Thanh Thẻ An ninh & IP Trực quan:**
-   * Hiển thị trạng thái xác thực, kênh dữ liệu hoạt động và dấu thời gian Việt Nam (`UTC+7`).
-2. **Đồng hồ Đo Áp lực Toàn Thị trường (Market OBI Gauge):**
-   * Đo lường tổng lực Cầu Mua vs Cung Bán tại Top 3 bước giá của toàn bộ rổ VN30, giúp nhận diện ngay thị trường phiên hôm nay đang nghiêng về **Phe Bò (Gom hàng)** hay **Phe Gấu (Đè bán)**.
-3. **Tab 1 - Bảng Lọc Realtime & Ma trận Chiến lược Thực chiến:**
-   * Tự động gắn nhãn chiến lược cho từng mã: 🚀 *Mua Bứt Phá*, 🛡️ *Tích Lũy Gom*, ⚪ *Quan Sát*, ⚠️ *Cảnh Báo Bán*.
-   * Đề xuất tỷ trọng giải ngân cụ thể (% NAV: 15%–20%, 10%–15%, hoặc 0% Đứng ngoài).
-4. **Tab 2 - Trực quan hóa Vi cấu trúc (Visual Analytics):**
-   * Biểu đồ phân tán Scatter OBI vs Biến động giá $\%\Delta P$ giúp bóc tách mối tương quan giữa áp lực đặt lệnh và biến động giá.
-   * Biểu đồ thanh ngang phân bổ giá trị giao dịch thực tế Top 15 cổ phiếu.
-5. **Tab 3 - Soi kèo Sổ lệnh & Kế hoạch Quản trị Rủi ro:**
-   * Bảng chi tiết 3 bước giá Mua/Bán và thanh tiến trình đo lường tỷ lệ gom hàng.
-   * Khung kế hoạch vào lệnh: Tự động tính toán **Vùng mua an toàn**, **Mục tiêu lợi nhuận (Target)**, **Ngưỡng cắt lỗ kỷ luật (Stop-Loss)** và tỷ lệ **Lợi nhuận/Rủi ro ($R:R$)**.
-   * Biểu đồ Radar 3 trục sức mạnh vi cấu trúc.
-6. **Tab 4 - Bộ Công cụ Môi giới Tạo Bản tin Tư vấn 1-Click (Broker Toolkit):**
-   * Môi giới chọn mã cổ phiếu, hệ thống tự động sinh bản tin khuyến nghị chuyên nghiệp chuẩn Công ty Chứng khoán, sẵn sàng bấm `Ctrl + C` để gửi khách hàng.
-7. **Tab 5 - Phương pháp luận Định lượng & Miễn trừ Học thuật:**
-   * Minh bạch toàn bộ công thức toán học (Cartea & Jaimungal, 2014) và tuyên bố trách nhiệm học thuật theo chuẩn đề thi UEL.
-
----
-
-## 🏗️ KIẾN TRÚC DỮ LIỆU KÉP (DUAL-ENGINE ARCHITECTURE)
-
-```
-           ┌────────────────────────────────────────────────────────┐
-           │     KIẾN TRÚC NGUỒN DỮ LIỆU KÉP (DUAL-ENGINE)          │
-           │                                                        │
-           │   [Cổng Chính]                    [Cổng Bổ Sung]       │
-           │   VPBankS NeoAPI                  SSI FastConnect v3   │
-           │   (Xác thực JWT Bearer)           (Ủy quyền tài khoản) │
-           └──────────┬─────────────────────────────────┬───────────┘
-                      │                                 │
-                      ▼                                 ▼
-         [src/neo_api/client.py & src/neo_api/ssi_client.py]
-         │ (Tự động phát hiện IP, điều phối luồng dữ liệu 100% Thật)
-         ▼
-    [Chuẩn hóa dữ liệu: Pydantic Data Models]
-    │ (StockSnapshot, StockOrderBook, PriceLevel, ForeignTrade)
-    ▼
-    [src/finance/indicators.py]
-    │ (Tính toán vi cấu trúc: OBI Top 3, Intra-day Momentum, Foreign Impact)
-    ▼
-    [src/analytics/ranking.py]
-    │ (Chuẩn hóa Percentile Ranking 0-100, Composite Multi-Factor Scoring)
-    ▼
-    [src/app/main.py]
-    │ (Streamlit Dashboard: Screener Realtime, Radar, Scatter OBI, Broker Toolkit)
-    ▼
- NGƯỜI DÙNG (Nhà đầu tư cá nhân / Chuyên viên Môi giới / Giảng viên UEL)
-```
-
----
-
-## 🔑 CẤU TRÚC MẪU CỦA TỆP BIẾN MÔI TRƯỜNG (.env.example)
-
-Quý Thầy/Cô hoặc người dùng muốn cấu hình tài khoản thực chỉ cần tham khảo [.env.example](file:///.env.example):
 ```bash
-# 1. Cấu hình VPBankS NeoAPI (Chỉ lưu trong .env cục bộ, không commit lên Git)
-NEO_USERNAME=your_vpbanks_username
-NEO_PASSWORD=your_vpbanks_password
-NEO_ACCOUNT_NO=your_account_number
-NEO_WHITELIST_IP=your_registered_ip
+# ------------------------------------------------------------------------------
+# 1. Cấu hình Tài khoản VPBankS NeoAPI (Dựa trên tài liệu đặc tả 158 trang)
+# ------------------------------------------------------------------------------
+NEO_USERNAME="your_vpbanks_username"          # Tên đăng nhập VPBankS NeoAPI
+NEO_PASSWORD="your_vpbanks_password"          # Mật khẩu đăng nhập VPBankS NeoAPI
+NEO_ACCOUNT_NO="your_vpbanks_account_no"      # Số tài khoản giao dịch
+NEO_WHITELIST_IP="your_whitelisted_ip"        # IP tĩnh đã đăng ký với VPBankS (nếu có)
 NEO_ENVIRONMENT=LIVE
 NEO_API_BASE_URL=https://neoapi.vpbanks.com.vn/neo-api
 NEO_AUTH_URL=https://external.vpbanks.com.vn/auth/token
@@ -152,42 +47,142 @@ NEO_DEVICE_TYPE=chrome
 NEO_REQUEST_TIMEOUT=15
 NEO_RATE_LIMIT_RPS=5.0
 
-# 2. Cấu hình Kênh bổ sung SSI FastConnect API v3
+# ------------------------------------------------------------------------------
+# 2. Cấu hình Kênh Bổ sung SSI FastConnect API v3 (Đặc tả Developer Portal 457 trang)
+# ------------------------------------------------------------------------------
 SSI_FASTCONNECT_URL=https://api.ssi.com.vn
 SSI_IBOARD_URL=https://iboard-query.ssi.com.vn
-SSI_API_KEY=your_ssi_api_key
-SSI_API_SECRET=your_ssi_api_secret
-SSI_PRIVATE_KEY=your_ssi_rsa_private_key
+SSI_API_KEY="your_ssi_api_key"                # Consumer API Key từ SSI Developer Portal
+SSI_API_SECRET="your_ssi_api_secret"          # Consumer API Secret từ SSI Developer Portal
+SSI_PRIVATE_KEY=""                            # RSA Private Key (đặt trong dấu ngoặc kép nếu có)
 
-# 3. Cấu hình Ứng dụng
+# ------------------------------------------------------------------------------
+# 3. Cấu hình Tham số Khởi động Ứng dụng
+# ------------------------------------------------------------------------------
 APP_ENV=development
 APP_PORT=8501
-DEFAULT_UNIVERSE=VN30
+DATA_CACHE_DIR=./data_sample
+DEFAULT_UNIVERSE=ALL                          # Mặc định lấy 100% toàn bộ thị trường
+```
+
+> **Ghi chú về nguồn cấp:**
+> * Hệ thống hỗ trợ cơ chế điều phối thông minh: Tự động kết nối **VPBankS NeoAPI** qua JWT Bearer.
+> * Nếu môi trường mạng cục bộ chưa kịp đăng ký IP Whitelist với VPBankS, hệ thống tự động định tuyến sang cổng bổ sung **SSI FastConnect API v3** để đảm bảo luôn hiển thị **100% dữ liệu thị trường thực tế**, không gián đoạn trải nghiệm của Giảng viên.
+
+#### Bước 3: Cài đặt thư viện phụ thuộc (nếu chưa có môi trường ảo)
+```powershell
+pip install -r requirements.txt
+```
+
+#### Bước 4: Khởi chạy Bảng điều khiển Định lượng (Streamlit Dashboard)
+```powershell
+# Chạy với môi trường ảo của dự án:
+$env:PYTHONPATH="."; .\.venv\Scripts\streamlit.exe run src/app/main.py
+
+# Hoặc nếu chạy với Python hệ thống:
+streamlit run src/app/main.py
+```
+Ứng dụng sẽ tự động mở trên trình duyệt tại địa chỉ: `http://localhost:8501`.
+
+#### Bước 5: Chạy Bộ Kiểm thử Tự động (Unit Test Suite)
+Để kiểm tra tính toàn vẹn của logic vi cấu trúc (OBI, Momentum, Foreign Flow) và khả năng xử lý dữ liệu:
+```powershell
+$env:PYTHONPATH="."; .\.venv\Scripts\pytest.exe -v
+```
+> Toàn bộ các kiểm thử đơn vị sẽ hoàn thành trong ~1 giây với kết quả **100% PASSED** mà không cần phụ thuộc vào mạng ngoài.
+
+---
+
+## 🌐 KHẢ NĂNG XỬ LÝ 100% DỮ LIỆU THỰC TẾ TOÀN BỘ CÁC MÃ TRÊN THỊ TRƯỜNG
+
+Hệ thống được lập trình dựa trên 2 bộ tài liệu kỹ thuật chính thức:
+1. **VPBankS NEO API Specification (158 trang):**
+   * Endpoint `GET /stock/stockDetail?marketCode=ALL` hỗ trợ phân trang (`pageNo`, `pageSize`, `totalPages`) tải toàn bộ dữ liệu thị trường.
+   * Endpoint `GET /stock/stockDetailByIndex?indexCode=VN30` tải rổ chỉ số VN30.
+2. **SSI FastConnect API v3 & iBoard Query Specification (457 trang):**
+   * Sàn HOSE (`/stock/exchange/hose`): ~414 mã cổ phiếu niêm yết.
+   * Sàn HNX (`/stock/exchange/hnx`): ~299 mã cổ phiếu niêm yết.
+   * Sàn UPCOM (`/stock/exchange/upcom`): ~807 mã cổ phiếu đăng ký giao dịch.
+   * Rổ VN30 (`/stock/group/VN30`): 30 cổ phiếu đầu ngành có tính thanh khoản cao nhất.
+
+Khi người dùng chọn tùy chọn `ALL (100% Toàn bộ Thị trường: HOSE, HNX, UPCOM)`, hệ thống sẽ quét và hợp nhất hơn **1.520+ mã cổ phiếu**, mang lại bức tranh định lượng hoàn chỉnh cho toàn thị trường chứng khoán Việt Nam mà không dùng bất kỳ dữ liệu giả lập (Zero Mock Data).
+
+---
+
+## 🖥️ THIẾT KẾ GIAO DIỆN HỢP NHẤT 1 TAB DUY NHẤT (ALL-IN-ONE DASHBOARD)
+
+Nhằm tối ưu hóa luồng thao tác của Giảng viên và Nhà đầu tư, giao diện ứng dụng được cấu trúc thành **1 Tab Duy Nhất**:  
+`📊 BẢNG ĐIỀU KHIỂN ĐỊNH LƯỢNG TOÀN THỊ TRƯỜNG & HỖ TRỢ RA QUYẾT ĐỊNH`
+
+Toàn bộ 5 phân khu chức năng được trình bày liên tục, trực quan theo thứ tự phân tích tài chính logic:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│  THANH TRẠNG THÁI HỆ THỐNG: Kênh dữ liệu thực tế, Whitelist IP, Giờ VN │
+├────────────────────────────────────────────────────────────────────────┤
+│  TỔNG QUAN ÁP LỰC: Đồng hồ Market OBI Gauge & 6 Thẻ Metric Thanh khoản │
+├────────────────────────────────────────────────────────────────────────┤
+│  [TAB DUY NHẤT: BẢNG ĐIỀU KHIỂN ĐỊNH LƯỢNG TOÀN DIỆN & HỖ TRỢ RA QUYẾT ĐỊNH]
+│                                                                        │
+│  📋 PHẦN 1: BẢNG LỌC CỔ PHIẾU ĐỊNH LƯỢNG & CHIẾN LƯỢC THỰC CHIẾN       │
+│     • Bảng lọc realtime đa nhân tố (Giá, %ΔP, OBI, Khối ngoại, Điểm)   │
+│     • Gắn nhãn chiến lược tự động: 🚀 Mua Bứt Phá, 🛡️ Tích Lũy Gom,    │
+│       ⚪ Quan Sát, ⚠️ Cảnh Báo Bán                                     │
+│     • Lọc động theo sàn (HOSE, HNX, UPCOM) và điểm số tối thiểu        │
+│                                                                        │
+│  📈 PHẦN 2: TRỰC QUAN HÓA VI CẤU TRÚC TOÀN THỊ TRƯỜNG                 │
+│     • Scatter Plot: Mối quan hệ giữa Độ lệch Sổ lệnh (OBI) & %ΔP Giá   │
+│     • Bar Chart: Phân bổ thanh khoản tiền thật Top 15 cổ phiếu lớn nhất│
+│                                                                        │
+│  🔬 PHẦN 3: SOI KÈO SỔ LỆNH CHI TIẾT & KHUNG QUẢN TRỊ RỦI RO           │
+│     • Bóc tách độ sâu sổ lệnh Top 3 Bước giá Bids / Asks               │
+│     • Thanh tiến trình đo tỷ lệ Gom Mua vs Đè Bán                      │
+│     • Khung mô phỏng tham chiếu: Vùng mua, Target, Stop-Loss, Tỷ lệ R:R│
+│     • Radar Chart 3 trục sức mạnh: Động lượng - Khối ngoại - OBI       │
+│                                                                        │
+│  📢 PHẦN 4: BẢN TIN PHÂN TÍCH HỌC THUẬT (BROKER FLASH NOTE)            │
+│     • Trình tạo tự động báo cáo phân tích vi cấu trúc 1-click          │
+│     • Sẵn sàng sao chép gửi khách hàng/nhà đầu tư                      │
+│                                                                        │
+│  📚 PHẦN 5: PHƯƠNG PHÁP LUẬN ĐỊNH LƯỢNG & MIỄN TRỪ TRÁCH NHIỆM         │
+│     • Minh bạch công thức toán học OBI, Momentum, Liquidity, Foreign   │
+│     • Tuyên bố miễn trừ rủi ro học thuật chuẩn mực UEL                 │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📂 CẤU TRÚC THƯ MỤC NGUỒN
+## 🔒 CAM KẾT BẢO MẬT VÀ QUYỀN RIÊNG TƯ (SECURITY BY DESIGN)
+
+1. **Không rò rỉ khóa bí mật:** Toàn bộ khóa truy cập và thông tin nhạy cảm được quản lý độc quyền qua biến môi trường cục bộ `.env`.
+2. **Loại trừ khỏi Git:** Tệp `.env` đã được đưa vào `.gitignore`, tuyệt đối không bao giờ xuất hiện trên GitHub hay kho lưu trữ mã nguồn mở.
+3. **Chế độ Chỉ Đọc (Read-Only Safety):** Hệ thống chỉ thực hiện các lệnh truy vấn dữ liệu thị trường (Market Data), không có mã lệnh gửi/hủy lệnh tiền thật, triệt tiêu mọi rủi ro tài chính.
+4. **Bảo vệ Hạ tầng API (Rate Limiting 5 RPS):** Tích hợp thuật toán `TokenBucket` kiểm soát tốc độ gọi API tối đa 5 yêu cầu/giây, tuân thủ đạo đức sử dụng hạ tầng của công ty chứng khoán.
+
+---
+
+## 📂 CẤU TRÚC THƯ MỤC DỰ ÁN
+
 ```
 D:\K244141706_NguyenHaYenVy_NEOAPI_FinTech\
-├── README.md                      # Hướng dẫn chi tiết & tài liệu dành cho giảng viên chấm
+├── README.md                      # Tài liệu hướng dẫn chi tiết dành cho Giảng viên & Nhà đầu tư
 ├── requirements.txt               # Danh mục thư viện Python phụ thuộc
-├── .env.example                   # Tệp mẫu cấu hình bảo mật (chỉ chứa placeholder)
-├── .gitignore                     # Bảo vệ tệp .env và bí mật không bị đẩy lên Git
+├── .env.example                   # Tệp mẫu cấu hình biến môi trường an toàn
+├── .gitignore                     # Bảo vệ tệp .env và bí mật cục bộ
 ├── report/
-│   └── K244141706_NguyenHaYenVy_BaoCao.md  # Báo cáo cuối kỳ 10 chương chuẩn mực đề thi
+│   └── K244141706_NguyenHaYenVy_BaoCao.md  # Báo cáo học thuật cuối kỳ 10 chương
 ├── src/
 │   ├── neo_api/
-│   │   ├── config.py              # Pydantic Settings & Quản lý biến môi trường an toàn
+│   │   ├── config.py              # Pydantic Settings & nạp biến môi trường an toàn
 │   │   ├── models.py              # Pydantic Data Models (Snapshot, OrderBook, ForeignTrade)
-│   │   ├── client.py              # NeoAPI client, quản lý IP whitelist & failover
-│   │   └── ssi_client.py          # SSI FastConnect v3 client (Kênh bổ sung 100% dữ liệu thật)
+│   │   ├── client.py              # NeoAPI client, quản lý kết nối & điều phối thông minh
+│   │   └── ssi_client.py          # SSI FastConnect v3 client (100% dữ liệu thật HOSE, HNX, UPCOM)
 │   ├── finance/
-│   │   └── indicators.py          # Bộ tính toán chỉ báo vi cấu trúc: OBI, Momentum, Foreign
+│   │   └── indicators.py          # Bộ chỉ báo vi cấu trúc: OBI Top 3, Intra-day Momentum, Foreign Impact
 │   ├── analytics/
-│   │   └── ranking.py             # Động cơ Xếp hạng đa nhân tố, Composite Score & Phân tầng tín hiệu
+│   │   └── ranking.py             # Động cơ Xếp hạng đa nhân tố & phân loại chiến lược thực chiến
 │   └── app/
-│       └── main.py                # Dashboard tương tác Streamlit (5 Tab chức năng thực chiến)
+│       └── main.py                # Dashboard Streamlit Hợp nhất 1 Tab duy nhất (All-in-One)
 └── tests/
     ├── test_neo_api.py            # Kiểm thử xác thực JWT, IP whitelist, SSI Client & Parse dữ liệu
     └── test_finance_ranking.py    # Kiểm thử công thức chỉ báo tài chính & động cơ xếp hạng
